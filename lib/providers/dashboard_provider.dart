@@ -307,7 +307,7 @@ class DashboardProvider extends ChangeNotifier {
     try {
       // 1. Fetch Nutrition / Calories
       final nutritionData = await _health.getHealthDataFromTypes(
-        types: [HealthDataType.NUTRITION, HealthDataType.ACTIVE_ENERGY_BURNED],
+        types: [HealthDataType.NUTRITION],
         startTime: midnight,
         endTime: now,
       );
@@ -316,12 +316,10 @@ class DashboardProvider extends ChangeNotifier {
       proteinGrams = 0.0;
 
       for (var data in nutritionData) {
-        // We will sum the values (simplistic placeholder logic for now)
-        if (data.type == HealthDataType.NUTRITION) {
-          // Health plugin nutrition parsing depends on the specific map structure
-          // For now we simulate with a baseline since parsing health connect macros can be complex in raw format
-          proteinGrams += 20.0; // Placeholder parser
-          totalCalories += 300.0; // Placeholder parser
+        final value = data.value;
+        if (value is NutritionHealthValue) {
+          totalCalories += value.calories ?? 0.0;
+          proteinGrams += value.protein ?? 0.0;
         }
       }
 

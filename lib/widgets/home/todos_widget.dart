@@ -23,30 +23,29 @@ class _TodosWidgetState extends State<TodosWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'TASKS & PROJECTS',
-                style: TextStyle(
-                  color: AppTheme.accentPurple,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 2.0,
-                ),
-              ),
-              Row(
-                children: [
-                  _buildTab(0, 'Today'),
-                  const SizedBox(width: 8),
-                  _buildTab(1, 'Tomorrow'),
-                  const SizedBox(width: 8),
-                  _buildTab(2, 'Important'),
-                  const SizedBox(width: 8),
-                  _buildTab(3, 'Projects'),
-                ],
-              ),
-            ],
+          const Text(
+            'TASKS & PROJECTS',
+            style: TextStyle(
+              color: AppTheme.accentPurple,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 2.0,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildTab(0, 'Today'),
+                const SizedBox(width: 8),
+                _buildTab(1, 'Tomorrow'),
+                const SizedBox(width: 8),
+                _buildTab(2, 'Important'),
+                const SizedBox(width: 8),
+                _buildTab(3, 'Projects'),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           if (_tabIndex == 0) _buildTodoList('Today\'s List (Isar syncing...)'),
