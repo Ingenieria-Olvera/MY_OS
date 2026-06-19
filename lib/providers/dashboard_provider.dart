@@ -29,6 +29,52 @@ class Investment {
   double get unrealizedPLPercent => totalCost > 0 ? (unrealizedPL / totalCost) * 100 : 0.0;
 }
 
+class FinancialGoal {
+  String name;
+  double targetAmount;
+  double currentAmount;
+  DateTime? targetDate;
+
+  FinancialGoal({
+    required this.name,
+    required this.targetAmount,
+    this.currentAmount = 0.0,
+    this.targetDate,
+  });
+
+  double get remainingAmount => (targetAmount - currentAmount).clamp(0, double.infinity);
+  double get progress => targetAmount > 0 ? (currentAmount / targetAmount).clamp(0.0, 1.0) : 0.0;
+  bool get isComplete => currentAmount >= targetAmount;
+
+  // Months left until targetDate, at least 1 so we never divide by zero.
+  int? get monthsRemaining {
+    if (targetDate == null) return null;
+    final now = DateTime.now();
+    final months = (targetDate!.year - now.year) * 12 + (targetDate!.month - now.month);
+    return months < 1 ? 1 : months;
+  }
+
+  double? get requiredMonthlyContribution {
+    final months = monthsRemaining;
+    if (months == null) return null;
+    return remainingAmount / months;
+  }
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'targetAmount': targetAmount,
+        'currentAmount': currentAmount,
+        'targetDate': targetDate?.toIso8601String(),
+      };
+
+  factory FinancialGoal.fromJson(Map<String, dynamic> data) => FinancialGoal(
+        name: data['name'] as String,
+        targetAmount: (data['targetAmount'] as num).toDouble(),
+        currentAmount: (data['currentAmount'] as num?)?.toDouble() ?? 0.0,
+        targetDate: data['targetDate'] != null ? DateTime.parse(data['targetDate'] as String) : null,
+      );
+}
+
 class DashboardProvider extends ChangeNotifier {
   // Hardcoded as requested
   List<Investment> investments = [
@@ -42,6 +88,7 @@ class DashboardProvider extends ChangeNotifier {
   DashboardProvider() {
     loadOverrides();
     refreshInvestments();
+    loadGoals();
   }
 
   Future<void> loadOverrides() async {
@@ -100,6 +147,43 @@ class DashboardProvider extends ChangeNotifier {
     }
 
     isFetchingInvestments = false;
+    notifyListeners();
+  }
+
+  // --- Financial Goals ---
+  static const String _goalsKey = 'financial_goals';
+  List<FinancialGoal> goals = [];
+
+  Future<void> loadGoals() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_goalsKey);
+    if (raw != null) {
+      final List<dynamic> decoded = json.decode(raw);
+      goals = decoded.map((g) => FinancialGoal.fromJson(g as Map<String, dynamic>)).toList();
+      notifyListeners();
+    }
+  }
+
+  Future<void> saveGoals() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_goalsKey, json.encode(goals.map((g) => g.toJson()).toList()));
+  }
+
+  void addGoal(FinancialGoal goal) {
+    goals.add(goal);
+    saveGoals();
+    notifyListeners();
+  }
+
+  void updateGoal(int index, FinancialGoal goal) {
+    goals[index] = goal;
+    saveGoals();
+    notifyListeners();
+  }
+
+  void deleteGoal(int index) {
+    goals.removeAt(index);
+    saveGoals();
     notifyListeners();
   }
 

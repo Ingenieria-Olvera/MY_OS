@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/home/investments_widget.dart';
+import '../widgets/home/financial_goals_widget.dart';
 import '../widgets/home/next_event_widget.dart';
 import '../widgets/home/health_metrics_widget.dart';
 import '../widgets/home/todos_widget.dart';
@@ -26,6 +27,9 @@ class DashboardScreen extends StatelessWidget {
                 Expanded(flex: 2, child: const NextEventWidget()),
               ],
             ),
+            const SizedBox(height: 24),
+            // Row 1.5: Financial Goals
+            const FinancialGoalsWidget(),
             const SizedBox(height: 24),
             // Row 2: Nutrition
             const HealthMetricsWidget(isNutrition: true),
