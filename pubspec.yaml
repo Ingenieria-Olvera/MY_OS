@@ -1,0 +1,59 @@
+name: my_os
+description: "MY OS — OA's offline-first life operating system."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Local filesystem access — reading the .md vault
+  path_provider: ^2.1.5
+  permission_handler: ^11.3.1
+
+  # Google Calendar API & Auth
+  google_sign_in: ^6.2.1
+  googleapis: ^13.1.0
+
+  # Market Data (Using http to fetch from Yahoo Finance API directly)
+  http: ^1.2.0
+
+  # Samsung Health / Google Fit
+  health: ^11.0.0
+
+  # Local persistence for overrides
+  shared_preferences: ^2.2.3
+
+  # Render plain-text Markdown from the vault
+  flutter_markdown: ^0.7.6
+
+  # Offline Isar database for metrics tracking
+  isar: ^3.1.0+1
+  isar_flutter_libs: ^3.1.0+1
+
+  # Lightweight state management
+  provider: ^6.1.2
+
+  # Premium typography
+  google_fonts: ^6.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+  # Isar code generation
+  isar_generator: ^3.1.0+1
+  build_runner: ^2.4.13
+
+flutter:
+  uses-material-design: true
+
+dependency_overrides:
+  path_provider_android: 2.2.14
