@@ -1,8 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../constants/vault_paths.dart';
+import '../services/obsidian_vault.dart';
 import '../theme/app_theme.dart';
+import 'note_viewer_screen.dart';
+import 'vault_tags_screen.dart';
 
 class NotesScreen extends StatefulWidget {
   const NotesScreen({super.key});
@@ -12,11 +15,10 @@ class NotesScreen extends StatefulWidget {
 }
 
 class _NotesScreenState extends State<NotesScreen> {
-  final String vaultPath = '/storage/emulated/0/Remote_vault/Cross_Study';
+  final String vaultPath = vaultRootPath;
   late Directory _currentDir;
   List<FileSystemEntity> _entities = [];
-  File? _selectedNote;
-  String _noteContent = '';
+  final VaultIndex _index = VaultIndex();
   bool _hasPermission = false;
   bool _isLoading = true;
 
@@ -28,16 +30,21 @@ class _NotesScreenState extends State<NotesScreen> {
   }
 
   Future<void> _requestPermissions() async {
-    if (await Permission.manageExternalStorage.request().isGranted || 
+    if (await Permission.manageExternalStorage.request().isGranted ||
         await Permission.storage.request().isGranted) {
       setState(() => _hasPermission = true);
       _loadDirectory();
+      _rebuildIndex();
     } else {
       setState(() {
         _hasPermission = false;
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _rebuildIndex() async {
+    await _index.build(Directory(vaultPath));
   }
 
   void _loadDirectory() {
@@ -67,12 +74,11 @@ class _NotesScreenState extends State<NotesScreen> {
     }
   }
 
-  Future<void> _openNote(File file) async {
-    final content = await file.readAsString();
-    setState(() {
-      _selectedNote = file;
-      _noteContent = content;
-    });
+  void _openNote(File file) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => NoteViewerScreen(file: file, index: _index)),
+    );
   }
 
   void _goUp() {
@@ -86,23 +92,32 @@ class _NotesScreenState extends State<NotesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_selectedNote != null) return _buildNoteViewer();
-
     final isRoot = _currentDir.path == vaultPath;
 
     return Scaffold(
       appBar: AppBar(
-        leading: !isRoot 
+        leading: !isRoot
             ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: _goUp)
             : null,
         title: Text(isRoot ? 'OBSIDIAN VAULT' : _currentDir.path.split('/').last),
+        actions: [
+          if (_hasPermission)
+            IconButton(
+              icon: const Icon(Icons.tag),
+              tooltip: 'Browse by tag',
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => VaultTagsScreen(index: _index)),
+              ),
+            ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.accentPurple))
           : !_hasPermission
               ? _buildPermissionError()
               : _buildDirectoryList(),
-      floatingActionButton: (!_isLoading && _hasPermission && _selectedNote == null)
+      floatingActionButton: (!_isLoading && _hasPermission)
           ? FloatingActionButton(
               backgroundColor: AppTheme.accentPurple,
               onPressed: () => _showCreateNoteDialog(),
@@ -139,6 +154,7 @@ class _NotesScreenState extends State<NotesScreen> {
                 final newFile = File('\${_currentDir.path}/$title.md');
                 await newFile.writeAsString('# $title\n\n');
                 _loadDirectory();
+                await _rebuildIndex();
                 Navigator.pop(context);
                 _openNote(newFile);
               }
@@ -224,30 +240,6 @@ class _NotesScreenState extends State<NotesScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildNoteViewer() {
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => setState(() {
-            _selectedNote = null;
-            _noteContent = '';
-          }),
-        ),
-        title: Text(_selectedNote!.path.split('/').last.replaceAll('.md', '')),
-      ),
-      body: Markdown(
-        data: _noteContent,
-        styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-          p: const TextStyle(color: AppTheme.textPrimary, fontSize: 16, height: 1.5),
-          h1: const TextStyle(color: AppTheme.accentPurple, fontSize: 24, fontWeight: FontWeight.bold),
-          h2: const TextStyle(color: AppTheme.textPrimary, fontSize: 20, fontWeight: FontWeight.bold),
-          code: const TextStyle(backgroundColor: Color(0xFF1E1E1E), color: AppTheme.statusGreen),
-        ),
-      ),
     );
   }
 }

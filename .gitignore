@@ -43,3 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Python scrapers -- secrets, caches, and the venv must never be committed
+python/.venv/
+python/.env
+python/*.log
+python/gmail_token.json
+python/*_token.json
+python/*client_secret*.json

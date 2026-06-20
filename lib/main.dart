@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import 'theme/app_theme.dart';
 import 'providers/dashboard_provider.dart';
 import 'providers/academics_provider.dart';
+import 'providers/inbox_provider.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/academics_screen.dart';
 import 'screens/notes_screen.dart';
+import 'screens/inbox_screen.dart';
 
 void main() {
   runApp(
@@ -13,6 +15,7 @@ void main() {
       providers: [
         ChangeNotifierProvider(create: (_) => DashboardProvider()),
         ChangeNotifierProvider(create: (_) => AcademicsProvider()),
+        ChangeNotifierProvider(create: (_) => InboxProvider()),
       ],
       child: const MyOSApp(),
     ),
@@ -47,12 +50,16 @@ class _MainShellState extends State<MainShell> {
     const DashboardScreen(),
     const AcademicsScreen(),
     const NotesScreen(),
+    const InboxScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
@@ -71,6 +78,11 @@ class _MainShellState extends State<MainShell> {
             icon: Icon(Icons.description_outlined),
             activeIcon: Icon(Icons.description),
             label: 'Notes',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.inbox_outlined),
+            activeIcon: Icon(Icons.inbox),
+            label: 'Inbox',
           ),
         ],
       ),
