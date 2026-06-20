@@ -50,7 +50,7 @@ class _NotesScreenState extends State<NotesScreen> {
   void _loadDirectory() {
     if (_currentDir.existsSync()) {
       final List<FileSystemEntity> items = _currentDir.listSync().where((e) {
-        if (e is Directory) return !e.path.split('/').last.startsWith('.');
+        if (e is Directory) return !e.path.replaceAll('\\', '/').split('/').last.startsWith('.');
         if (e is File) return e.path.endsWith('.md');
         return false;
       }).toList();
@@ -99,7 +99,7 @@ class _NotesScreenState extends State<NotesScreen> {
         leading: !isRoot
             ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: _goUp)
             : null,
-        title: Text(isRoot ? 'OBSIDIAN VAULT' : _currentDir.path.split('/').last),
+        title: Text(isRoot ? 'OBSIDIAN VAULT' : _currentDir.path.replaceAll('\\', '/').split('/').last),
         actions: [
           if (_hasPermission)
             IconButton(
@@ -216,7 +216,7 @@ class _NotesScreenState extends State<NotesScreen> {
             itemBuilder: (context, index) {
               final entity = _entities[index];
               final isDir = entity is Directory;
-              final name = entity.path.split('/').last.replaceAll('.md', '');
+              final name = entity.path.replaceAll('\\', '/').split('/').last.replaceAll('.md', '');
               
               return ListTile(
                 leading: Icon(
