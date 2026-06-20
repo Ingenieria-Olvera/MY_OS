@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../constants/vault_paths.dart';
 import '../services/obsidian_vault.dart';
 import '../theme/app_theme.dart';
 import 'note_viewer_screen.dart';
@@ -14,7 +15,7 @@ class NotesScreen extends StatefulWidget {
 }
 
 class _NotesScreenState extends State<NotesScreen> {
-  final String vaultPath = '/storage/emulated/0/Remote_vault/Cross_Study';
+  final String vaultPath = vaultRootPath;
   late Directory _currentDir;
   List<FileSystemEntity> _entities = [];
   final VaultIndex _index = VaultIndex();
