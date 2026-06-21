@@ -1,0 +1,154 @@
+"""Fetch today's events across your Google calendars (work/personal/school,
+or however you've split them) and write a merged day-layout digest with
+suggested gaps for exercise, winding down, or studying.
+
+Reuses the same OAuth client as gmail_scraper.py by default (set
+GOOGLE_CALENDAR_CLIENT_SECRET_FILE to override) — see python/README.md for
+setup and the GOOGLE_CALENDAR_IDS / GOOGLE_CALENDAR_LABELS env vars used to
+list your calendars.
+"""
+import os
+import sys
+from datetime import datetime, timedelta
+from typing import List, Tuple
+
+from common.config import Config, load_config
+from common.digest_writer import write_digest
+
+SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+
+
+def fetch_events_for_calendar(
+    service, calendar_id: str, label: str, time_min: datetime, time_max: datetime
+) -> List[dict]:
+    events = []
+    resp = service.events().list(
+        calendarId=calendar_id,
+        timeMin=time_min.isoformat(),
+        timeMax=time_max.isoformat(),
+        singleEvents=True,
+        orderBy="startTime",
+    ).execute()
+
+    for item in resp.get("items", []):
+        start = item.get("start", {})
+        end = item.get("end", {})
+        events.append({
+            "label": label,
+            "summary": item.get("summary", "(no title)"),
+            "start": start.get("dateTime") or start.get("date"),
+            "end": end.get("dateTime") or end.get("date"),
+            "all_day": "date" in start,
+        })
+    return events
+
+
+def compute_gaps(
+    events: List[dict], day_start: datetime, day_end: datetime, min_gap_minutes: int
+) -> List[Tuple[datetime, datetime]]:
+    """Free windows of at least `min_gap_minutes` between timed events."""
+    timed = sorted((e for e in events if not e["all_day"]), key=lambda e: e["start"])
+    min_gap = timedelta(minutes=min_gap_minutes)
+
+    gaps = []
+    cursor = day_start
+    for event in timed:
+        start = datetime.fromisoformat(event["start"])
+        end = datetime.fromisoformat(event["end"])
+        if start > cursor and (start - cursor) >= min_gap:
+            gaps.append((cursor, start))
+        cursor = max(cursor, end)
+    if day_end > cursor and (day_end - cursor) >= min_gap:
+        gaps.append((cursor, day_end))
+    return gaps
+
+
+def suggest_for_gap(gap_start: datetime, gap_end: datetime, has_exercise_today: bool) -> dict:
+    """Heuristic: evenings wind down, the first open daytime gap is exercise
+    (if nothing exercise-related is already on the calendar today), and
+    everything else defaults to study/focused work."""
+    duration = gap_end - gap_start
+    hour = gap_start.hour
+
+    if hour >= 19 or hour < 6:
+        kind, reason = "wind_down", "Evening gap — good time to read or wind down before bed."
+    elif not has_exercise_today and duration >= timedelta(minutes=30):
+        kind, reason = "exercise", "Open block with no workout logged yet today."
+    elif duration >= timedelta(minutes=45):
+        kind, reason = "study", "Solid open block — good for focused study or project work."
+    else:
+        kind, reason = "study", "Short gap — good for a quick study or admin task."
+
+    return {
+        "start": gap_start.isoformat(),
+        "end": gap_end.isoformat(),
+        "type": kind,
+        "reason": reason,
+    }
+
+
+def build_day_layout(
+    events: List[dict], day_start: datetime, day_end: datetime, min_gap_minutes: int
+) -> List[dict]:
+    has_exercise_today = any(
+        "exercise" in e["summary"].lower() or "gym" in e["summary"].lower() or "workout" in e["summary"].lower()
+        for e in events
+    )
+
+    suggestions = []
+    for gap_start, gap_end in compute_gaps(events, day_start, day_end, min_gap_minutes):
+        suggestion = suggest_for_gap(gap_start, gap_end, has_exercise_today)
+        suggestions.append(suggestion)
+        if suggestion["type"] == "exercise":
+            has_exercise_today = True  # only suggest exercise once per day
+    return suggestions
+
+
+def _calendar_pairs(config: Config) -> List[Tuple[str, str]]:
+    ids = config.google_calendar_ids
+    labels = config.google_calendar_labels
+    if len(labels) < len(ids):
+        labels = labels + ids[len(labels):]
+    return list(zip(ids, labels))
+
+
+def main() -> int:
+    # Imported lazily: these pull in network/crypto libs only needed here,
+    # not by the pure scheduling logic above (which is unit tested).
+    from googleapiclient.discovery import build
+    from common.google_auth import load_credentials
+
+    config = load_config()
+    client_secret_file = config.google_calendar_client_secret_file or config.gmail_client_secret_file
+    if not client_secret_file:
+        print(
+            "GOOGLE_CALENDAR_CLIENT_SECRET_FILE (or GMAIL_CLIENT_SECRET_FILE) is not set; "
+            "see python/.env.example",
+            file=sys.stderr,
+        )
+        return 1
+
+    creds = load_credentials(client_secret_file, config.google_calendar_token_file, SCOPES)
+    service = build("calendar", "v3", credentials=creds)
+
+    now = datetime.now().astimezone()
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end = day_start + timedelta(days=1)
+
+    events: List[dict] = []
+    for calendar_id, label in _calendar_pairs(config):
+        events += fetch_events_for_calendar(service, calendar_id, label, day_start, day_end)
+    events.sort(key=lambda e: e["start"])
+
+    suggestions = build_day_layout(events, max(day_start, now), day_end, config.calendar_min_gap_minutes)
+
+    write_digest(
+        os.path.join(config.vault_inbox_dir, "calendar_digest.json"),
+        {"events": events, "suggestions": suggestions},
+    )
+    print(f"Wrote {len(events)} events and {len(suggestions)} suggestions to {config.vault_inbox_dir}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

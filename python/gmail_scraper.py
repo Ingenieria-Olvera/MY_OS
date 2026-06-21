@@ -10,32 +10,13 @@ import sys
 from email.utils import parsedate_to_datetime
 from typing import List
 
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
 from common.config import load_config
 from common.digest_writer import write_digest
+from common.google_auth import load_credentials
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
-
-
-def _load_credentials(client_secret_file: str, token_file: str) -> Credentials:
-    creds = None
-    if os.path.exists(token_file):
-        creds = Credentials.from_authorized_user_file(token_file, SCOPES)
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(client_secret_file, SCOPES)
-            creds = flow.run_local_server(port=0)
-        with open(token_file, "w", encoding="utf-8") as f:
-            f.write(creds.to_json())
-
-    return creds
 
 
 def _header(headers: List[dict], name: str) -> str:
@@ -80,7 +61,7 @@ def main() -> int:
         print("GMAIL_CLIENT_SECRET_FILE is not set; see python/.env.example", file=sys.stderr)
         return 1
 
-    creds = _load_credentials(config.gmail_client_secret_file, config.gmail_token_file)
+    creds = load_credentials(config.gmail_client_secret_file, config.gmail_token_file, SCOPES)
     service = build("gmail", "v1", credentials=creds)
 
     emails = fetch_important_emails(service, config.gmail_query, config.gmail_max_results)
