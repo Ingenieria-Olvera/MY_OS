@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/dashboard_provider.dart';
+import '../../providers/calendar_provider.dart';
 import '../../theme/app_theme.dart';
 
 class NextEventWidget extends StatelessWidget {
@@ -8,8 +8,9 @@ class NextEventWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<DashboardProvider>(
+    return Consumer<CalendarProvider>(
       builder: (context, provider, child) {
+        final next = provider.nextEvent;
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -35,7 +36,7 @@ class NextEventWidget extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (provider.isFetchingCalendar)
+                  if (provider.isLoading)
                     const SizedBox(
                       width: 12,
                       height: 12,
@@ -47,25 +48,14 @@ class NextEventWidget extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              if (!provider.isGoogleCalendarConnected)
-                Center(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.accentPurple.withOpacity(0.2),
-                      foregroundColor: AppTheme.accentPurple,
-                    ),
-                    onPressed: () => provider.connectGoogleCalendar(),
-                    child: const Text('Connect Google Calendar'),
-                  ),
-                )
-              else if (provider.nextEventTitle == null)
+              if (next == null)
                 const Text('No upcoming events', style: TextStyle(color: AppTheme.textSecondary))
               else
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      provider.nextEventTitle!,
+                      next.summary,
                       style: const TextStyle(
                         color: AppTheme.textPrimary,
                         fontSize: 18,
@@ -81,7 +71,7 @@ class NextEventWidget extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            provider.nextEventTime!,
+                            '${TimeOfDay.fromDateTime(next.start).format(context)} · ${next.label}',
                             style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
                             overflow: TextOverflow.ellipsis,
                           ),

@@ -17,25 +17,24 @@ dependencies:
   path_provider: ^2.1.5
   permission_handler: ^11.3.1
 
-  # Google Calendar API & Auth
-  google_sign_in: ^6.2.1
-  googleapis: ^13.1.0
-
-  # Market Data (Using http to fetch from Yahoo Finance API directly)
+  # Market Data (Using http to fetch from Yahoo Finance API directly, and to
+  # talk to the local Ollama agent over the home network)
   http: ^1.2.0
 
-  # Samsung Health / Google Fit
+  # Samsung Health / Google Fit — Health Connect access has to happen
+  # on-device, so unlike Calendar/Slack/Gmail this isn't moved to a Python
+  # scraper.
   health: ^11.0.0
 
-  # Local persistence for overrides
+  # Local persistence: digest read-state, todo completion, financial goal
+  # overrides, chat history. Google Calendar is now read from
+  # calendar_digest.json (written by python/calendar_scraper.py) instead of
+  # a live in-app OAuth call, so google_sign_in/googleapis are no longer
+  # needed here.
   shared_preferences: ^2.2.3
 
   # Render plain-text Markdown from the vault
   flutter_markdown: ^0.7.6
-
-  # Offline Isar database for metrics tracking
-  isar: ^3.1.0+1
-  isar_flutter_libs: ^3.1.0+1
 
   # Lightweight state management
   provider: ^6.1.2
@@ -47,10 +46,6 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-
-  # Isar code generation
-  isar_generator: ^3.1.0+1
-  build_runner: ^2.4.13
 
 flutter:
   uses-material-design: true

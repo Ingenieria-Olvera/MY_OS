@@ -67,7 +67,8 @@ Edit `.env`:
 
 No setup beyond `VAULT_ROOT_DIR` — it scans your vault's Markdown files for
 open checkboxes (`- [ ] ...`). See `todos_aggregator.py`'s module docstring
-for the due-date/tag syntax it understands.
+for the due-date/tag syntax it understands. Tag a checkbox `#hw` to have it
+surface in the app's Academics screen as outstanding homework.
 
 ### Local agent
 

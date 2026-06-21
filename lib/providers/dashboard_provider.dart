@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:googleapis/calendar/v3.dart' as cal;
 import 'package:health/health.dart';
 import 'dart:convert';
 
@@ -187,74 +185,6 @@ class DashboardProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- Calendar Data ---
-  bool isGoogleCalendarConnected = false;
-  bool isFetchingCalendar = false;
-  String? nextEventTitle;
-  String? nextEventTime;
-
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: [cal.CalendarApi.calendarReadonlyScope],
-  );
-
-  Future<void> connectGoogleCalendar() async {
-    try {
-      final GoogleSignInAccount? account = await _googleSignIn.signIn();
-      if (account != null) {
-        bool isAuthorized = await _googleSignIn.canAccessScopes([cal.CalendarApi.calendarReadonlyScope]);
-        if (!isAuthorized) {
-          isAuthorized = await _googleSignIn.requestScopes([cal.CalendarApi.calendarReadonlyScope]);
-        }
-        if (isAuthorized) {
-          isGoogleCalendarConnected = true;
-          await fetchNextEvent(account);
-        } else {
-          debugPrint('User denied calendar scope.');
-        }
-      }
-    } catch (error) {
-      debugPrint('Error signing in: $error');
-    }
-  }
-
-  Future<void> fetchNextEvent(GoogleSignInAccount account) async {
-    isFetchingCalendar = true;
-    notifyListeners();
-
-    try {
-      final authHeaders = await account.authHeaders;
-      final authenticateClient = _GoogleAuthClient(authHeaders);
-      final calendarApi = cal.CalendarApi(authenticateClient);
-
-      final events = await calendarApi.events.list(
-        'primary',
-        timeMin: DateTime.now().toUtc(),
-        maxResults: 1,
-        singleEvents: true,
-        orderBy: 'startTime',
-      );
-
-      if (events.items != null && events.items!.isNotEmpty) {
-        final nextEvent = events.items!.first;
-        nextEventTitle = nextEvent.summary;
-        final start = nextEvent.start?.dateTime ?? nextEvent.start?.date;
-        if (start != null) {
-          nextEventTime = '${start.hour}:${start.minute.toString().padLeft(2, "0")}';
-        } else {
-          nextEventTime = 'All day';
-        }
-      } else {
-        nextEventTitle = null;
-        nextEventTime = null;
-      }
-    } catch (e) {
-      debugPrint('Error fetching calendar: $e');
-    }
-
-    isFetchingCalendar = false;
-    notifyListeners();
-  }
-
   // --- Health Data ---
   final Health _health = Health();
   bool isHealthConnected = false;
@@ -339,17 +269,5 @@ class DashboardProvider extends ChangeNotifier {
       debugPrint('Error fetching health data: $e');
     }
     notifyListeners();
-  }
-}
-
-class _GoogleAuthClient extends http.BaseClient {
-  final Map<String, String> _headers;
-  final http.Client _client = http.Client();
-
-  _GoogleAuthClient(this._headers);
-
-  @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) {
-    return _client.send(request..headers.addAll(_headers));
   }
 }

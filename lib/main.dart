@@ -4,10 +4,14 @@ import 'theme/app_theme.dart';
 import 'providers/dashboard_provider.dart';
 import 'providers/academics_provider.dart';
 import 'providers/inbox_provider.dart';
+import 'providers/calendar_provider.dart';
+import 'providers/todos_provider.dart';
+import 'providers/chat_provider.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/academics_screen.dart';
-import 'screens/notes_screen.dart';
+import 'screens/todos_screen.dart';
 import 'screens/inbox_screen.dart';
+import 'screens/more_screen.dart';
 
 void main() {
   runApp(
@@ -16,6 +20,9 @@ void main() {
         ChangeNotifierProvider(create: (_) => DashboardProvider()),
         ChangeNotifierProvider(create: (_) => AcademicsProvider()),
         ChangeNotifierProvider(create: (_) => InboxProvider()),
+        ChangeNotifierProvider(create: (_) => CalendarProvider()),
+        ChangeNotifierProvider(create: (_) => TodosProvider()),
+        ChangeNotifierProvider(create: (_) => ChatProvider()),
       ],
       child: const MyOSApp(),
     ),
@@ -48,9 +55,10 @@ class _MainShellState extends State<MainShell> {
 
   final List<Widget> _screens = [
     const DashboardScreen(),
-    const AcademicsScreen(),
-    const NotesScreen(),
+    const TodosScreen(),
     const InboxScreen(),
+    const AcademicsScreen(),
+    const MoreScreen(),
   ];
 
   @override
@@ -63,11 +71,22 @@ class _MainShellState extends State<MainShell> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
+        type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.speed_outlined),
             activeIcon: Icon(Icons.speed),
-            label: 'Home',
+            label: 'Today',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.check_circle_outline),
+            activeIcon: Icon(Icons.check_circle),
+            label: 'Todos',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.inbox_outlined),
+            activeIcon: Icon(Icons.inbox),
+            label: 'Inbox',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.school_outlined),
@@ -75,14 +94,9 @@ class _MainShellState extends State<MainShell> {
             label: 'Academics',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.description_outlined),
-            activeIcon: Icon(Icons.description),
-            label: 'Notes',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.inbox_outlined),
-            activeIcon: Icon(Icons.inbox),
-            label: 'Inbox',
+            icon: Icon(Icons.more_horiz),
+            activeIcon: Icon(Icons.more_horiz),
+            label: 'More',
           ),
         ],
       ),

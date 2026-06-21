@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/inbox_provider.dart';
 import '../../theme/app_theme.dart';
 
 class NotificationsWidget extends StatelessWidget {
@@ -6,41 +8,49 @@ class NotificationsWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'NOTIFICATIONS & ALERTS',
-            style: TextStyle(
-              color: AppTheme.accentPurple,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 2.0,
-            ),
+    return Consumer<InboxProvider>(
+      builder: (context, provider, child) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withOpacity(0.05)),
           ),
-          const SizedBox(height: 16),
-          _buildNotificationItem(
-            icon: Icons.mail_outline,
-            title: 'Gmail Scraper (Pending)',
-            subtitle: 'No recent critical emails detected.',
-            color: Colors.redAccent,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'NEEDS A RESPONSE',
+                style: TextStyle(
+                  color: AppTheme.accentPurple,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 2.0,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildNotificationItem(
+                icon: Icons.mail_outline,
+                title: 'Email',
+                subtitle: provider.unreadEmailCount > 0
+                    ? '${provider.unreadEmailCount} unread important email${provider.unreadEmailCount == 1 ? '' : 's'}'
+                    : 'No recent critical emails detected.',
+                color: Colors.redAccent,
+              ),
+              const SizedBox(height: 16),
+              _buildNotificationItem(
+                icon: Icons.chat_bubble_outline,
+                title: 'Slack',
+                subtitle: provider.unreadSlackCount > 0
+                    ? '${provider.unreadSlackCount} unread message${provider.unreadSlackCount == 1 ? '' : 's'}'
+                    : 'No unread direct messages.',
+                color: Colors.blueAccent,
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          _buildNotificationItem(
-            icon: Icons.chat_bubble_outline,
-            title: 'Slack Scraper (Pending)',
-            subtitle: 'No unread direct messages.',
-            color: Colors.blueAccent,
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
