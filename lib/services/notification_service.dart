@@ -116,11 +116,11 @@ class NotificationService {
   }) async {
     try {
       await _plugin.zonedSchedule(
-        id,
-        title,
-        body,
-        tz.TZDateTime.from(at.toUtc(), tz.UTC),
-        const NotificationDetails(
+        id: id,
+        title: title,
+        body: body,
+        scheduledDate: tz.TZDateTime.from(at.toUtc(), tz.UTC),
+        notificationDetails: const NotificationDetails(
           android: AndroidNotificationDetails(
             'reminders',
             'Reminders',

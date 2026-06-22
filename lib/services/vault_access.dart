@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:saf_stream/saf_stream.dart';
 import 'package:saf_util/saf_util.dart';
+import 'package:saf_util/saf_util_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// One file or folder inside the user-picked vault tree. Wraps the
@@ -122,6 +123,17 @@ class VaultAccess {
       Uint8List.fromList(utf8.encode(content)),
       overwrite: true,
     );
+  }
+
+  /// Appends [line] (with a trailing newline) to [fileName] inside [dirUri],
+  /// creating the file if it doesn't exist yet. Used for manually-added
+  /// todo checkboxes, so they land as plain Markdown the Python aggregator
+  /// already knows how to parse.
+  static Future<void> appendLine(String dirUri, String fileName, String line) async {
+    final existing = await child(dirUri, fileName);
+    final current = existing != null ? (await readAsString(existing.uri) ?? '') : '';
+    final separator = current.isEmpty || current.endsWith('\n') ? '' : '\n';
+    await writeString(dirUri, fileName, '$current$separator$line\n');
   }
 
   /// Recursively lists every `.md` file under [rootUri], skipping the
