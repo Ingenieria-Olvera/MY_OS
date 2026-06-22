@@ -19,8 +19,8 @@ dependencies:
   # Storage Access Framework — lets the user pick the synced vault folder
   # once and grants persisted access to just that folder, so the app never
   # needs broad storage permissions.
-  saf_util: ^3.1.0
-  saf_stream: ^3.0.0
+  saf_util: any
+  saf_stream: any
 
   # Market Data (Using http to fetch from Yahoo Finance API directly, and to
   # talk to the local Ollama agent over the home network)

@@ -10,9 +10,8 @@ class TodosProvider extends ChangeNotifier {
   List<TodoItem> overarching = [];
   bool isLoading = true;
   Set<String> _completedIds = {};
-
   TodosProvider() {
-    _loadCompletedIds().then((_) => refresh());
+    _loadCompletedIds();
   }
 
   bool isCompleted(String id) => _completedIds.contains(id);
