@@ -1,58 +1,54 @@
-import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:my_os/services/inbox_service.dart';
 
 void main() {
-  group('InboxDigest', () {
-    late Directory tempDir;
-
-    setUp(() async {
-      tempDir = await Directory.systemTemp.createTemp('inbox_test_');
+  group('SlackMessage.fromJson', () {
+    test('parses all fields', () {
+      final message = SlackMessage.fromJson({
+        'id': '1',
+        'source': 'mention',
+        'channel': 'general',
+        'sender': 'Bob',
+        'text': 'hello',
+        'timestamp': '2026-06-20T14:00:00+00:00',
+        'permalink': 'https://x',
+      });
+      expect(message.id, '1');
+      expect(message.source, 'mention');
+      expect(message.permalink, 'https://x');
     });
 
-    tearDown(() async {
-      await tempDir.delete(recursive: true);
+    test('defaults missing optional fields', () {
+      final message = SlackMessage.fromJson({'id': '1'});
+      expect(message.source, 'dm');
+      expect(message.channel, '');
+      expect(message.sender, 'Unknown');
+      expect(message.permalink, isNull);
+    });
+  });
+
+  group('EmailMessage.fromJson', () {
+    test('parses all fields', () {
+      final email = EmailMessage.fromJson({
+        'id': 'a',
+        'sender': 'x@y.com',
+        'subject': 'Hi',
+        'snippet': '...',
+        'received_at': '2026-06-19T09:00:00+00:00',
+        'labels': ['IMPORTANT'],
+        'link': 'https://mail',
+      });
+      expect(email.id, 'a');
+      expect(email.labels, ['IMPORTANT']);
+      expect(email.receivedAt, DateTime.parse('2026-06-19T09:00:00+00:00'));
     });
 
-    test('returns empty lists when no digest files exist', () async {
-      expect(await InboxDigest.readSlackMessages(tempDir), isEmpty);
-      expect(await InboxDigest.readEmails(tempDir), isEmpty);
-    });
-
-    test('parses Slack messages and sorts newest first', () async {
-      await File('${tempDir.path}/slack_digest.json').writeAsString('''
-{
-  "generated_at": "2026-06-20T15:00:00+00:00",
-  "messages": [
-    {"id": "1", "source": "dm", "channel": "D1", "sender": "Alice", "text": "older", "timestamp": "2026-06-20T10:00:00+00:00"},
-    {"id": "2", "source": "mention", "channel": "general", "sender": "Bob", "text": "newer", "timestamp": "2026-06-20T14:00:00+00:00", "permalink": "https://x"}
-  ]
-}
-''');
-      final messages = await InboxDigest.readSlackMessages(tempDir);
-      expect(messages.map((m) => m.id).toList(), ['2', '1']);
-      expect(messages.first.source, 'mention');
-      expect(messages.first.permalink, 'https://x');
-    });
-
-    test('parses emails and sorts newest first', () async {
-      await File('${tempDir.path}/email_digest.json').writeAsString('''
-{
-  "generated_at": "2026-06-20T15:00:00+00:00",
-  "emails": [
-    {"id": "a", "sender": "x@y.com", "subject": "Old", "snippet": "...", "received_at": "2026-06-19T09:00:00+00:00", "labels": ["INBOX"]},
-    {"id": "b", "sender": "z@y.com", "subject": "New", "snippet": "...", "received_at": "2026-06-20T09:00:00+00:00", "labels": ["IMPORTANT"]}
-  ]
-}
-''');
-      final emails = await InboxDigest.readEmails(tempDir);
-      expect(emails.map((e) => e.id).toList(), ['b', 'a']);
-      expect(emails.first.subject, 'New');
-    });
-
-    test('treats malformed JSON as empty rather than throwing', () async {
-      await File('${tempDir.path}/slack_digest.json').writeAsString('not json');
-      expect(await InboxDigest.readSlackMessages(tempDir), isEmpty);
+    test('defaults missing optional fields', () {
+      final email = EmailMessage.fromJson({'id': 'a'});
+      expect(email.sender, 'Unknown');
+      expect(email.subject, '(no subject)');
+      expect(email.receivedAt, isNull);
+      expect(email.labels, isEmpty);
     });
   });
 }

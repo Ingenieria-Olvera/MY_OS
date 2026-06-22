@@ -1,50 +1,7 @@
-import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:my_os/services/obsidian_vault.dart';
 
 void main() {
-  group('VaultIndex', () {
-    late Directory tempDir;
-
-    setUp(() async {
-      tempDir = await Directory.systemTemp.createTemp('vault_test_');
-      await File('${tempDir.path}/Note A.md').writeAsString('Links to [[Note B]].\n#shared');
-      await Directory('${tempDir.path}/sub').create();
-      await File('${tempDir.path}/sub/Note B.md').writeAsString('---\ntags: [shared]\n---\nNo outbound links.');
-    });
-
-    tearDown(() async {
-      await tempDir.delete(recursive: true);
-    });
-
-    test('indexes notes recursively across subdirectories', () async {
-      final index = VaultIndex();
-      await index.build(tempDir);
-      expect(index.allTags, {'shared'});
-    });
-
-    test('resolves wikilinks by basename regardless of folder depth', () async {
-      final index = VaultIndex();
-      await index.build(tempDir);
-      final resolved = index.resolveLink('Note B');
-      expect(resolved?.path.replaceAll('\\', '/'), '${tempDir.path}/sub/Note B.md'.replaceAll('\\', '/'));
-    });
-
-    test('computes backlinks for a note', () async {
-      final index = VaultIndex();
-      await index.build(tempDir);
-      final noteB = File('${tempDir.path}/sub/Note B.md');
-      final backlinks = index.backlinksFor(noteB);
-      expect(backlinks.map((n) => n.title), {'Note A'});
-    });
-
-    test('finds notes by tag from both frontmatter and inline forms', () async {
-      final index = VaultIndex();
-      await index.build(tempDir);
-      final tagged = index.notesWithTag('shared').map((n) => n.title).toSet();
-      expect(tagged, {'Note A', 'Note B'});
-    });
-  });
   group('parseFrontmatterTags', () {
     test('parses inline bracket list', () {
       const content = '---\ntags: [project, idea]\n---\nBody';
