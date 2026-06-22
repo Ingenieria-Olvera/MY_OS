@@ -10,6 +10,11 @@ from typing import List, Optional
 try:
     from dotenv import load_dotenv
     load_dotenv()
+    if os.path.exists("python/.env"):
+        load_dotenv("python/.env")
+    sibling_env = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+    if os.path.exists(sibling_env):
+        load_dotenv(sibling_env, override=True)
 except ImportError:
     pass
 
@@ -57,12 +62,26 @@ def load_config() -> Config:
             "your synced Obsidian vault, e.g. /path/to/Cross_Study/_inbox "
             "(see python/.env.example)."
         )
+
+    google_creds = os.environ.get("GOOGLE_CREDENTIALS_FILE")
+    if not google_creds:
+        if os.path.exists("credentials.json"):
+            google_creds = "credentials.json"
+        elif os.path.exists(os.path.join("python", "credentials.json")):
+            google_creds = os.path.join("python", "credentials.json")
+        else:
+            google_creds = os.path.join(os.path.dirname(os.path.dirname(__file__)), "credentials.json")
+
+    google_token = os.environ.get("GOOGLE_TOKEN_FILE")
+    if not google_token:
+        google_token = os.path.join(os.path.dirname(google_creds) or ".", "google_token.json")
+
     return Config(
         vault_inbox_dir=vault_inbox_dir,
         slack_user_token=os.environ.get("SLACK_USER_TOKEN"),
         slack_lookback_hours=int(os.environ.get("SLACK_LOOKBACK_HOURS", "24")),
-        google_credentials_file=os.environ.get("GOOGLE_CREDENTIALS_FILE", "credentials.json"),
-        google_token_file=os.environ.get("GOOGLE_TOKEN_FILE", "google_token.json"),
+        google_credentials_file=google_creds,
+        google_token_file=google_token,
         gmail_query=os.environ.get("GMAIL_QUERY", "is:unread is:important"),
         gmail_max_results=int(os.environ.get("GMAIL_MAX_RESULTS", "25")),
         vault_root_dir=os.environ.get("VAULT_ROOT_DIR"),

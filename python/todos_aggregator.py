@@ -46,7 +46,7 @@ def parse_vault_todos(vault_root: str) -> List[dict]:
             path = os.path.join(root, name)
             rel_path = os.path.relpath(path, vault_root)
             try:
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, "r", encoding="utf-8", errors="ignore") as f:
                     lines = f.readlines()
             except OSError:
                 continue

@@ -23,14 +23,32 @@ GOOGLE_SCOPES = GMAIL_SCOPES + CALENDAR_SCOPES
 def load_credentials(client_secret_file: str, token_file: str, scopes: List[str]) -> Credentials:
     creds = None
     if os.path.exists(token_file):
-        creds = Credentials.from_authorized_user_file(token_file, scopes)
+        try:
+            creds = Credentials.from_authorized_user_file(token_file, scopes)
+        except Exception:
+            # Stale or corrupted token file; force re-authentication
+            creds = None
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
+            try:
+                creds.refresh(Request())
+            except Exception:
+                # Refresh failed (e.g. token revoked); force re-authentication
+                creds = None
+
+        # Re-check in case refresh failed
+        if not creds or not creds.valid:
+            if not os.path.exists(client_secret_file):
+                raise FileNotFoundError(
+                    f"\n[GOOGLE AUTH ERROR] Client secrets file not found at: {os.path.abspath(client_secret_file)}\n"
+                    "Please download the OAuth 2.0 Client ID JSON (Desktop App type) from your Google Cloud Console, "
+                    "save it as 'credentials.json' in the 'python/' folder, or configure GOOGLE_CREDENTIALS_FILE "
+                    "in your 'python/.env' file. See python/README.md for details."
+                )
             flow = InstalledAppFlow.from_client_secrets_file(client_secret_file, scopes)
             creds = flow.run_local_server(port=0)
+            
         with open(token_file, "w", encoding="utf-8") as f:
             f.write(creds.to_json())
 
