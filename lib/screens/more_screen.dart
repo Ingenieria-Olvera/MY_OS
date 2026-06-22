@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import 'calendar_screen.dart';
 import 'chat_screen.dart';
 import 'financial_screen.dart';
 import 'health_screen.dart';
@@ -16,6 +17,7 @@ class MoreScreen extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
           _buildTile(context, Icons.chat_bubble_outline, 'Secretary Chat', const ChatScreen()),
+          _buildTile(context, Icons.calendar_today_outlined, 'Calendar', const CalendarScreen()),
           _buildTile(context, Icons.description_outlined, 'Notes', const NotesScreen()),
           _buildTile(context, Icons.account_balance_outlined, 'Financial', const FinancialScreen()),
           _buildTile(context, Icons.favorite_outline, 'Health', const HealthScreen()),

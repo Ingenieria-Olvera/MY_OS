@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/vault_paths.dart';
@@ -38,9 +37,9 @@ class TodosProvider extends ChangeNotifier {
   Future<void> refresh() async {
     isLoading = true;
     notifyListeners();
-    final inboxDir = Directory(vaultInboxPath);
-    today = await TodosDigest.readToday(inboxDir);
-    overarching = await TodosDigest.readOverarching(inboxDir);
+    final inboxUri = await resolveVaultInboxUri();
+    today = await TodosDigest.readToday(inboxUri);
+    overarching = await TodosDigest.readOverarching(inboxUri);
     isLoading = false;
     notifyListeners();
   }

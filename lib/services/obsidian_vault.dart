@@ -1,14 +1,14 @@
-import 'dart:io';
+import 'vault_access.dart';
 
 /// A single Markdown note discovered while indexing the vault.
 class VaultNote {
-  final File file;
+  final VaultEntry entry;
   final String title;
   final Set<String> tags;
   final Set<String> linkTargets;
 
   VaultNote({
-    required this.file,
+    required this.entry,
     required this.title,
     required this.tags,
     required this.linkTargets,
@@ -18,48 +18,43 @@ class VaultNote {
 /// Recursively indexes an Obsidian-style vault so wikilinks, tags, and
 /// backlinks can be resolved without re-reading the filesystem on every tap.
 class VaultIndex {
-  final Map<String, VaultNote> _notesByPath = {};
-  final Map<String, List<File>> _filesByBasename = {};
+  final Map<String, VaultNote> _notesByUri = {};
+  final Map<String, List<VaultEntry>> _entriesByBasename = {};
 
   Set<String> get allTags {
     final tags = <String>{};
-    for (final note in _notesByPath.values) {
+    for (final note in _notesByUri.values) {
       tags.addAll(note.tags);
     }
     return tags;
   }
 
   List<VaultNote> notesWithTag(String tag) =>
-      _notesByPath.values.where((n) => n.tags.contains(tag)).toList();
+      _notesByUri.values.where((n) => n.tags.contains(tag)).toList();
 
-  Future<void> build(Directory root) async {
-    _notesByPath.clear();
-    _filesByBasename.clear();
-    if (!root.existsSync()) return;
+  /// Builds the index from the vault rooted at [rootUri] (the SAF tree the
+  /// user picked). A null [rootUri] (no vault picked yet) yields an empty
+  /// index.
+  Future<void> build(String? rootUri) async {
+    _notesByUri.clear();
+    _entriesByBasename.clear();
+    if (rootUri == null) return;
 
-    final files = root
-        .listSync(recursive: true)
-        .whereType<File>()
-        .where((f) => f.path.endsWith('.md'))
-        .toList();
+    final entries = await VaultAccess.listMarkdownFilesRecursive(rootUri);
 
-    for (final file in files) {
-      final key = _basenameNoExt(file.path).toLowerCase();
-      _filesByBasename.putIfAbsent(key, () => []).add(file);
+    for (final entry in entries) {
+      final key = _basenameNoExt(entry.name).toLowerCase();
+      _entriesByBasename.putIfAbsent(key, () => []).add(entry);
     }
 
-    for (final file in files) {
-      String content;
-      try {
-        content = await file.readAsString();
-      } catch (_) {
-        continue;
-      }
+    for (final entry in entries) {
+      final content = await VaultAccess.readAsString(entry.uri);
+      if (content == null) continue;
       final body = stripFrontmatter(content);
       final tags = {...parseFrontmatterTags(content), ...extractInlineTags(body)};
-      _notesByPath[file.path] = VaultNote(
-        file: file,
-        title: _basenameNoExt(file.path),
+      _notesByUri[entry.uri] = VaultNote(
+        entry: entry,
+        title: _basenameNoExt(entry.name),
         tags: tags,
         linkTargets: extractWikilinkTargets(body),
       );
@@ -67,25 +62,22 @@ class VaultIndex {
   }
 
   /// Resolves a wikilink target (e.g. "Note Name" from `[[Note Name]]`) to a
-  /// file anywhere in the vault, matching Obsidian's basename resolution.
-  File? resolveLink(String target) {
+  /// note anywhere in the vault, matching Obsidian's basename resolution.
+  VaultEntry? resolveLink(String target) {
     final key = target.split('#').first.trim().toLowerCase();
-    final matches = _filesByBasename[key];
+    final matches = _entriesByBasename[key];
     if (matches == null || matches.isEmpty) return null;
     return matches.first;
   }
 
-  List<VaultNote> backlinksFor(File file) {
-    final targetKey = _basenameNoExt(file.path).toLowerCase();
-    final normalizedFilePath = file.path.replaceAll('\\', '/');
-    return _notesByPath.values
-        .where((n) => n.file.path.replaceAll('\\', '/') != normalizedFilePath && n.linkTargets.any((t) => t.toLowerCase() == targetKey))
+  List<VaultNote> backlinksFor(VaultEntry entry) {
+    final targetKey = _basenameNoExt(entry.name).toLowerCase();
+    return _notesByUri.values
+        .where((n) => n.entry.uri != entry.uri && n.linkTargets.any((t) => t.toLowerCase() == targetKey))
         .toList();
   }
 
-  static String _basenameNoExt(String path) {
-    final normalized = path.replaceAll('\\', '/');
-    final name = normalized.split('/').last;
+  static String _basenameNoExt(String name) {
     return name.endsWith('.md') ? name.substring(0, name.length - 3) : name;
   }
 }

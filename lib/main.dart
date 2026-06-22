@@ -12,8 +12,13 @@ import 'screens/academics_screen.dart';
 import 'screens/todos_screen.dart';
 import 'screens/inbox_screen.dart';
 import 'screens/more_screen.dart';
+import 'screens/vault_setup_screen.dart';
+import 'services/notification_service.dart';
+import 'services/vault_access.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.init();
   runApp(
     MultiProvider(
       providers: [
@@ -38,8 +43,65 @@ class MyOSApp extends StatelessWidget {
       title: 'MY OS',
       theme: AppTheme.darkTheme,
       debugShowCheckedModeBanner: false,
-      home: const MainShell(),
+      home: const VaultGate(),
     );
+  }
+}
+
+/// Gates the app behind picking a vault folder on first launch. Once a
+/// folder is picked (or was already picked in a previous session), shows
+/// the normal [MainShell] and kicks off the providers' first refresh +
+/// notification scheduling.
+class VaultGate extends StatefulWidget {
+  const VaultGate({super.key});
+
+  @override
+  State<VaultGate> createState() => _VaultGateState();
+}
+
+class _VaultGateState extends State<VaultGate> {
+  bool? _hasVault;
+
+  @override
+  void initState() {
+    super.initState();
+    VaultAccess.hasVaultAccess().then((has) {
+      if (!mounted) return;
+      setState(() => _hasVault = has);
+      if (has) _refreshAndScheduleNotifications();
+    });
+  }
+
+  void _refreshAndScheduleNotifications() {
+    final calendar = context.read<CalendarProvider>();
+    final todos = context.read<TodosProvider>();
+    final inbox = context.read<InboxProvider>();
+    Future.wait([calendar.refresh(), todos.refresh(), inbox.refresh()]).then((_) {
+      NotificationService.scheduleAll(
+        todos: todos.pendingToday + todos.pendingOverarching,
+        events: calendar.events,
+        emails: inbox.emails,
+      );
+    });
+  }
+
+  void _onVaultPicked() {
+    setState(() => _hasVault = true);
+    _refreshAndScheduleNotifications();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hasVault == null) {
+      return const Scaffold(
+        backgroundColor: AppTheme.background,
+        body: Center(child: CircularProgressIndicator(color: AppTheme.accentPurple)),
+      );
+    }
+    if (_hasVault == false) {
+      return VaultSetupScreen(onPicked: _onVaultPicked);
+    }
+    return const MainShell();
   }
 }
 

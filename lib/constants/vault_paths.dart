@@ -1,8 +1,10 @@
-/// Root of the Obsidian vault that's synced onto this device (e.g. via
-/// Syncthing) and shared by the Notes screen and the Python scrapers' Inbox
-/// digests.
-const String vaultRootPath = '/storage/emulated/0/Remote_vault/Cross_Study';
+import '../services/vault_access.dart';
 
-/// Folder inside the vault where the Python scrapers write
-/// slack_digest.json / email_digest.json. See python/README.md.
-const String vaultInboxPath = '$vaultRootPath/_inbox';
+/// Resolves the `_inbox` folder URI inside the vault the user picked via
+/// the Storage Access Framework (see [VaultAccess]). Returns null if no
+/// vault has been picked yet, or if the picked vault has no `_inbox`
+/// folder (the Python scrapers create it on first write).
+Future<String?> resolveVaultInboxUri() => VaultAccess.resolveInboxUri();
+
+/// Resolves the picked vault's root folder URI, or null if none picked yet.
+Future<String?> resolveVaultRootUri() => VaultAccess.getVaultRootUri();

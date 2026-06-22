@@ -1,8 +1,6 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
-import '../constants/vault_paths.dart';
 import '../services/obsidian_vault.dart';
+import '../services/vault_access.dart';
 import '../theme/app_theme.dart';
 import 'note_viewer_screen.dart';
 import 'vault_tags_screen.dart';
@@ -15,93 +13,105 @@ class NotesScreen extends StatefulWidget {
 }
 
 class _NotesScreenState extends State<NotesScreen> {
-  final String vaultPath = vaultRootPath;
-  late Directory _currentDir;
-  List<FileSystemEntity> _entities = [];
+  final List<VaultEntry> _pathStack = [];
+  List<VaultEntry> _entities = [];
   final VaultIndex _index = VaultIndex();
-  bool _hasPermission = false;
+  bool _hasAccess = false;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _currentDir = Directory(vaultPath);
-    _requestPermissions();
+    _init();
   }
 
-  Future<void> _requestPermissions() async {
-    if (await Permission.manageExternalStorage.request().isGranted ||
-        await Permission.storage.request().isGranted) {
-      setState(() => _hasPermission = true);
-      _loadDirectory();
-      _rebuildIndex();
-    } else {
+  Future<void> _init() async {
+    final hasAccess = await VaultAccess.hasVaultAccess();
+    if (!hasAccess) {
       setState(() {
-        _hasPermission = false;
+        _hasAccess = false;
         _isLoading = false;
       });
+      return;
     }
+    final rootUri = await VaultAccess.getVaultRootUri();
+    _pathStack
+      ..clear()
+      ..add(VaultEntry(uri: rootUri!, name: 'VAULT', isDir: true));
+    await _loadDirectory();
+    await _rebuildIndex();
+    setState(() {
+      _hasAccess = true;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _pickFolder() async {
+    final uri = await VaultAccess.pickVaultFolder();
+    if (uri == null) return;
+    setState(() => _isLoading = true);
+    _pathStack
+      ..clear()
+      ..add(VaultEntry(uri: uri, name: 'VAULT', isDir: true));
+    await _loadDirectory();
+    await _rebuildIndex();
+    setState(() {
+      _hasAccess = true;
+      _isLoading = false;
+    });
   }
 
   Future<void> _rebuildIndex() async {
-    await _index.build(Directory(vaultPath));
+    await _index.build(_pathStack.isEmpty ? null : _pathStack.first.uri);
   }
 
-  void _loadDirectory() {
-    if (_currentDir.existsSync()) {
-      final List<FileSystemEntity> items = _currentDir.listSync().where((e) {
-        if (e is Directory) return !e.path.replaceAll('\\', '/').split('/').last.startsWith('.');
-        if (e is File) return e.path.endsWith('.md');
-        return false;
-      }).toList();
-      
-      // Sort directories first, then files
-      items.sort((a, b) {
-        if (a is Directory && b is File) return -1;
-        if (a is File && b is Directory) return 1;
-        return a.path.compareTo(b.path);
-      });
+  Future<void> _loadDirectory() async {
+    final children = await VaultAccess.list(_pathStack.last.uri);
+    final items = children.where((e) {
+      if (e.isDir) return e.name != VaultAccess.inboxFolderName && !e.name.startsWith('.');
+      return e.name.toLowerCase().endsWith('.md');
+    }).toList();
 
-      setState(() {
-        _entities = items;
-        _isLoading = false;
-      });
-    } else {
-      setState(() {
-        _entities = [];
-        _isLoading = false;
-      });
-    }
+    items.sort((a, b) {
+      if (a.isDir && !b.isDir) return -1;
+      if (!a.isDir && b.isDir) return 1;
+      return a.name.compareTo(b.name);
+    });
+
+    setState(() => _entities = items);
   }
 
-  void _openNote(File file) {
+  void _openNote(VaultEntry entry) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => NoteViewerScreen(file: file, index: _index)),
+      MaterialPageRoute(builder: (_) => NoteViewerScreen(entry: entry, index: _index)),
     );
   }
 
-  void _goUp() {
-    if (_currentDir.path != vaultPath) {
-      setState(() {
-        _currentDir = _currentDir.parent;
-      });
-      _loadDirectory();
+  Future<void> _enterDir(VaultEntry entry) async {
+    _pathStack.add(entry);
+    await _loadDirectory();
+  }
+
+  Future<void> _goUp() async {
+    if (_pathStack.length > 1) {
+      _pathStack.removeLast();
+      await _loadDirectory();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isRoot = _currentDir.path == vaultPath;
+    final isRoot = _pathStack.length <= 1;
 
     return Scaffold(
       appBar: AppBar(
-        leading: !isRoot
+        leading: (_hasAccess && !isRoot)
             ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: _goUp)
             : null,
-        title: Text(isRoot ? 'OBSIDIAN VAULT' : _currentDir.path.replaceAll('\\', '/').split('/').last),
+        title: Text(isRoot ? 'OBSIDIAN VAULT' : _pathStack.last.name),
         actions: [
-          if (_hasPermission)
+          if (_hasAccess)
             IconButton(
               icon: const Icon(Icons.tag),
               tooltip: 'Browse by tag',
@@ -114,10 +124,10 @@ class _NotesScreenState extends State<NotesScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.accentPurple))
-          : !_hasPermission
-              ? _buildPermissionError()
+          : !_hasAccess
+              ? _buildChooseFolder()
               : _buildDirectoryList(),
-      floatingActionButton: (!_isLoading && _hasPermission)
+      floatingActionButton: (!_isLoading && _hasAccess)
           ? FloatingActionButton(
               backgroundColor: AppTheme.accentPurple,
               onPressed: () => _showCreateNoteDialog(),
@@ -147,17 +157,15 @@ class _NotesScreenState extends State<NotesScreen> {
           TextButton(
             onPressed: () async {
               final title = titleController.text.trim();
-              if (title.isNotEmpty) {
-                if (!_currentDir.existsSync()) {
-                  _currentDir.createSync(recursive: true);
-                }
-                final newFile = File('\${_currentDir.path}/$title.md');
-                await newFile.writeAsString('# $title\n\n');
-                _loadDirectory();
-                await _rebuildIndex();
-                Navigator.pop(context);
-                _openNote(newFile);
-              }
+              if (title.isEmpty) return;
+              final dirUri = _pathStack.last.uri;
+              await VaultAccess.writeString(dirUri, '$title.md', '# $title\n\n');
+              await _loadDirectory();
+              await _rebuildIndex();
+              if (!context.mounted) return;
+              Navigator.pop(context);
+              final newEntry = await VaultAccess.child(dirUri, '$title.md');
+              if (newEntry != null) _openNote(newEntry);
             },
             child: const Text('Create', style: TextStyle(color: AppTheme.accentPurple)),
           ),
@@ -166,19 +174,28 @@ class _NotesScreenState extends State<NotesScreen> {
     );
   }
 
-  Widget _buildPermissionError() {
+  Widget _buildChooseFolder() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.folder_off, size: 64, color: AppTheme.textSecondary),
+          const Icon(Icons.folder_open, size: 64, color: AppTheme.textSecondary),
           const SizedBox(height: 16),
-          const Text('Storage Permission Required', style: TextStyle(color: AppTheme.textPrimary)),
+          const Text('No vault folder selected', style: TextStyle(color: AppTheme.textPrimary)),
+          const SizedBox(height: 8),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              'Pick the synced Obsidian vault folder on this device. The app only gets access to that one folder.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+            ),
+          ),
           const SizedBox(height: 16),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accentPurple),
-            onPressed: () => openAppSettings(),
-            child: const Text('Open Settings'),
+            onPressed: _pickFolder,
+            child: const Text('Choose Vault Folder'),
           ),
         ],
       ),
@@ -194,7 +211,7 @@ class _NotesScreenState extends State<NotesScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (_currentDir.path == vaultPath) ...[
+        if (_pathStack.length <= 1) ...[
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 24, 16, 8),
             child: Text(
@@ -215,24 +232,21 @@ class _NotesScreenState extends State<NotesScreen> {
             itemCount: _entities.length,
             itemBuilder: (context, index) {
               final entity = _entities[index];
-              final isDir = entity is Directory;
-              final name = entity.path.replaceAll('\\', '/').split('/').last.replaceAll('.md', '');
-              
+              final isDir = entity.isDir;
+              final name = isDir ? entity.name : entity.name.replaceAll('.md', '');
+
               return ListTile(
                 leading: Icon(
-                  isDir ? Icons.folder : Icons.description, 
+                  isDir ? Icons.folder : Icons.description,
                   color: isDir ? AppTheme.statusOrange : AppTheme.accentPurple,
                 ),
                 title: Text(name, style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold)),
                 trailing: isDir ? const Icon(Icons.chevron_right, color: AppTheme.textSecondary) : null,
                 onTap: () {
                   if (isDir) {
-                    setState(() {
-                      _currentDir = entity;
-                    });
-                    _loadDirectory();
+                    _enterDir(entity);
                   } else {
-                    _openNote(entity as File);
+                    _openNote(entity);
                   }
                 },
               );

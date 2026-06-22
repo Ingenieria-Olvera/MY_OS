@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import '../constants/vault_paths.dart';
 import '../services/calendar_service.dart';
@@ -23,9 +22,9 @@ class CalendarProvider extends ChangeNotifier {
   Future<void> refresh() async {
     isLoading = true;
     notifyListeners();
-    final inboxDir = Directory(vaultInboxPath);
-    events = await CalendarDigest.readEvents(inboxDir);
-    suggestions = await CalendarDigest.readSuggestions(inboxDir);
+    final inboxUri = await resolveVaultInboxUri();
+    events = await CalendarDigest.readEvents(inboxUri);
+    suggestions = await CalendarDigest.readSuggestions(inboxUri);
     isLoading = false;
     notifyListeners();
   }

@@ -1,5 +1,5 @@
-import 'dart:convert';
-import 'dart:io';
+import '../constants/vault_paths.dart';
+import 'vault_access.dart';
 
 /// A Slack DM or @-mention surfaced by `python/slack_scraper.py`.
 class SlackMessage {
@@ -69,10 +69,11 @@ class EmailMessage {
 }
 
 /// Reads the Slack/Gmail digest JSON files that the Python scrapers write
-/// into the vault's `_inbox` folder.
+/// into the vault's `_inbox` folder (resolved via the SAF-picked vault —
+/// see [VaultAccess]).
 class InboxDigest {
-  static Future<List<SlackMessage>> readSlackMessages(Directory inboxDir) async {
-    final data = await _readJson(inboxDir, 'slack_digest.json');
+  static Future<List<SlackMessage>> readSlackMessages([String? inboxUri]) async {
+    final data = await _readDigest(inboxUri, 'slack_digest.json');
     if (data == null) return [];
     final messages = (data['messages'] as List<dynamic>? ?? const [])
         .map((m) => SlackMessage.fromJson(m as Map<String, dynamic>))
@@ -81,8 +82,8 @@ class InboxDigest {
     return messages;
   }
 
-  static Future<List<EmailMessage>> readEmails(Directory inboxDir) async {
-    final data = await _readJson(inboxDir, 'email_digest.json');
+  static Future<List<EmailMessage>> readEmails([String? inboxUri]) async {
+    final data = await _readDigest(inboxUri, 'email_digest.json');
     if (data == null) return [];
     final emails = (data['emails'] as List<dynamic>? ?? const [])
         .map((m) => EmailMessage.fromJson(m as Map<String, dynamic>))
@@ -91,14 +92,11 @@ class InboxDigest {
     return emails;
   }
 
-  static Future<Map<String, dynamic>?> _readJson(Directory inboxDir, String filename) async {
-    final file = File('${inboxDir.path}/$filename');
-    if (!await file.exists()) return null;
-    try {
-      final content = await file.readAsString();
-      return jsonDecode(content) as Map<String, dynamic>;
-    } catch (_) {
-      return null;
-    }
+  static Future<Map<String, dynamic>?> _readDigest(String? inboxUri, String filename) async {
+    final uri = inboxUri ?? await resolveVaultInboxUri();
+    if (uri == null) return null;
+    final fileEntry = await VaultAccess.child(uri, filename);
+    if (fileEntry == null) return null;
+    return VaultAccess.readJson(fileEntry.uri);
   }
 }
