@@ -16,7 +16,7 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
 from common.config import load_config
-from common.digest_writer import write_digest
+from common.digest_writer import write_digest, write_markdown_digest
 
 
 def _user_display_name(client: WebClient, user_cache: Dict[str, str], user_id: str) -> str:
@@ -116,6 +116,30 @@ def main() -> int:
         os.path.join(config.vault_inbox_dir, "slack_digest.json"),
         {"messages": messages},
     )
+    
+    # Generate slack_digest.md for Obsidian
+    md_content = f"# 💬 Slack Digest\n*Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n\n"
+    if not messages:
+        md_content += "No new Slack messages or mentions.\n"
+    for msg in messages:
+        sender = msg.get("sender", "Unknown")
+        channel = msg.get("channel", "")
+        text = msg.get("text", "")
+        permalink = msg.get("permalink", "")
+        source_label = "DM" if msg.get("source") == "dm" else f"Mention in #{channel}"
+        
+        md_content += f"- [ ] **{sender}** ({source_label})\n"
+        if text:
+            md_content += f"  > {text}\n"
+        if permalink:
+            md_content += f"  > [Open in Slack]({permalink})\n"
+        md_content += "\n"
+        
+    write_markdown_digest(
+        os.path.join(config.vault_inbox_dir, "slack_digest.md"),
+        md_content
+    )
+    
     print(f"Wrote {len(messages)} Slack messages to {config.vault_inbox_dir}")
     return 0
 

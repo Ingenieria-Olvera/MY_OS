@@ -19,7 +19,7 @@ from datetime import date, datetime
 from typing import List, Optional
 
 from common.config import load_config
-from common.digest_writer import write_digest
+from common.digest_writer import write_digest, write_markdown_digest
 
 CHECKBOX_RE = re.compile(r"^\s*-\s*\[ \]\s*(.+)$")
 DUE_DATE_RE = re.compile(r"(?:📅|due:)\s*(\d{4}-\d{2}-\d{2})", re.IGNORECASE)
@@ -157,6 +157,31 @@ def main() -> int:
 
     buckets = classify(todos, today)
     write_digest(os.path.join(config.vault_inbox_dir, "todos_digest.json"), buckets)
+    
+    # Generate todos_digest.md for Obsidian
+    md_content = f"# 📋 Unified Todos\n*Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n\n"
+    
+    md_content += "## Today's Tasks\n"
+    if not buckets["today"]:
+        md_content += "No tasks for today — nice!\n"
+    else:
+        for todo in buckets["today"]:
+            due_str = f" | Due: {todo['due']}" if todo.get("due") else ""
+            md_content += f"- [ ] {todo['text']} *({todo['source']}{due_str})*\n"
+            
+    md_content += "\n## Overarching & Ongoing Tasks\n"
+    if not buckets["overarching"]:
+        md_content += "No overarching tasks.\n"
+    else:
+        for todo in buckets["overarching"]:
+            due_str = f" | Due: {todo['due']}" if todo.get("due") else ""
+            md_content += f"- [ ] {todo['text']} *({todo['source']}{due_str})*\n"
+            
+    write_markdown_digest(
+        os.path.join(config.vault_inbox_dir, "todos_digest.md"),
+        md_content
+    )
+    
     print(
         f"Wrote {len(buckets['today'])} today / {len(buckets['overarching'])} "
         f"overarching todos to {config.vault_inbox_dir}"

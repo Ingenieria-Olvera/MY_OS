@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from typing import List, Tuple
 
 from common.config import Config, load_config
-from common.digest_writer import write_digest
+from common.digest_writer import write_digest, write_markdown_digest
 
 
 def fetch_events_for_calendar(
@@ -140,6 +140,47 @@ def main() -> int:
         os.path.join(config.vault_inbox_dir, "calendar_digest.json"),
         {"events": events, "suggestions": suggestions},
     )
+    
+    # Generate calendar_digest.md for Obsidian
+    md_content = f"# 📅 Calendar Digest\n*Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n\n"
+    md_content += "## Today's Schedule\n"
+    if not events:
+        md_content += "No events scheduled for today.\n"
+    else:
+        for event in events:
+            time_str = ""
+            if event.get("all_day"):
+                time_str = "All Day"
+            else:
+                try:
+                    start_dt = datetime.fromisoformat(event["start"])
+                    end_dt = datetime.fromisoformat(event["end"])
+                    time_str = f"{start_dt.strftime('%H:%M')} - {end_dt.strftime('%H:%M')}"
+                except Exception:
+                    time_str = event["start"]
+            
+            md_content += f"- **{time_str}** [{event.get('label', '')}] {event.get('summary', '')}\n"
+            
+    md_content += "\n## Gap Suggestions\n"
+    if not suggestions:
+        md_content += "No suggestions for today.\n"
+    else:
+        for sug in suggestions:
+            try:
+                start_dt = datetime.fromisoformat(sug["start"])
+                end_dt = datetime.fromisoformat(sug["end"])
+                time_str = f"{start_dt.strftime('%H:%M')} - {end_dt.strftime('%H:%M')}"
+            except Exception:
+                time_str = sug["start"]
+            
+            emoji = "🏋️" if sug["type"] == "exercise" else ("🛌" if sug["type"] == "wind_down" else "📖")
+            md_content += f"- **{time_str}**: {emoji} **{sug['type'].upper()}** - {sug['reason']}\n"
+            
+    write_markdown_digest(
+        os.path.join(config.vault_inbox_dir, "calendar_digest.md"),
+        md_content
+    )
+    
     print(f"Wrote {len(events)} events and {len(suggestions)} suggestions to {config.vault_inbox_dir}")
     return 0
 

@@ -15,7 +15,7 @@ from typing import List
 from googleapiclient.discovery import build
 
 from common.config import load_config
-from common.digest_writer import write_digest
+from common.digest_writer import write_digest, write_markdown_digest
 from common.google_auth import GOOGLE_SCOPES, load_credentials
 
 
@@ -71,6 +71,29 @@ def main() -> int:
         os.path.join(config.vault_inbox_dir, "email_digest.json"),
         {"emails": emails},
     )
+    
+    # Generate email_digest.md for Obsidian
+    from datetime import datetime
+    md_content = f"# ✉️ Email Digest\n*Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n\n"
+    if not emails:
+        md_content += "No unread/important emails.\n"
+    for email in emails:
+        sender = email.get("sender", "Unknown")
+        subject = email.get("subject", "No Subject")
+        snippet = email.get("snippet", "")
+        link = email.get("link", "")
+        md_content += f"- [ ] **{sender}**: {subject}\n"
+        if snippet:
+            md_content += f"  > {snippet}\n"
+        if link:
+            md_content += f"  > [View in Gmail]({link})\n"
+        md_content += "\n"
+        
+    write_markdown_digest(
+        os.path.join(config.vault_inbox_dir, "email_digest.md"),
+        md_content
+    )
+    
     print(f"Wrote {len(emails)} emails to {config.vault_inbox_dir}")
     return 0
 
