@@ -1,14 +1,14 @@
-"""Fetch important/unread Gmail messages and write them to the vault inbox
-as JSON for the MY OS app to read.
+"""Fetch important/unread Gmail messages across one or more Google accounts
+and write them to the vault inbox as JSON for the MY OS app to read.
 
-Shares one `credentials.json` OAuth client and one cached token with
-calendar_scraper.py (see common/google_auth.py) — the first run of either
-script requests both scopes together, so only one browser consent is ever
-needed. After that the cached token in GOOGLE_TOKEN_FILE makes subsequent
-(e.g. cron) runs of both scrapers non-interactive. See python/README.md.
+Each configured account (see GOOGLE_ACCOUNTS in python/.env.example) shares
+its OAuth scopes with calendar_scraper.py (see common/google_auth.py) — the
+first run of either script against a given account requests both scopes
+together, so only one browser consent per account is ever needed. After
+that, the account's cached token file makes subsequent (e.g. cron) runs
+non-interactive. See python/README.md.
 """
 import os
-import sys
 from email.utils import parsedate_to_datetime
 from typing import List
 
@@ -57,14 +57,16 @@ def fetch_important_emails(service, query: str, max_results: int) -> List[dict]:
 
 def main() -> int:
     config = load_config()
-    if not config.google_credentials_file:
-        print("GOOGLE_CREDENTIALS_FILE is not set; see python/.env.example", file=sys.stderr)
-        return 1
 
-    creds = load_credentials(config.google_credentials_file, config.google_token_file, GOOGLE_SCOPES)
-    service = build("gmail", "v1", credentials=creds)
+    emails = []
+    for account, creds_file, token_file in config.google_account_triples():
+        creds = load_credentials(creds_file, token_file, GOOGLE_SCOPES)
+        service = build("gmail", "v1", credentials=creds)
+        account_emails = fetch_important_emails(service, config.gmail_query, config.gmail_max_results)
+        for email in account_emails:
+            email["account"] = account
+        emails += account_emails
 
-    emails = fetch_important_emails(service, config.gmail_query, config.gmail_max_results)
     emails.sort(key=lambda e: e["received_at"] or "", reverse=True)
 
     write_digest(

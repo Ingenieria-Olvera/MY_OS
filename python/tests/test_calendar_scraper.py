@@ -1,11 +1,24 @@
 import os
 import sys
 import unittest
+from dataclasses import replace
 from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from calendar_scraper import build_day_layout, compute_gaps, suggest_for_gap  # noqa: E402
+from calendar_scraper import _calendar_pairs, build_day_layout, compute_gaps, suggest_for_gap  # noqa: E402
+from common.config import Config  # noqa: E402
+
+
+def _config(**overrides) -> Config:
+    base = Config(
+        vault_inbox_dir="/tmp/inbox",
+        slack_user_token=None,
+        slack_lookback_hours=24,
+        gmail_query="is:unread",
+        gmail_max_results=25,
+    )
+    return replace(base, **overrides)
 
 
 def _dt(hour, minute=0):
@@ -63,6 +76,44 @@ class BuildDayLayoutTests(unittest.TestCase):
         events = [{"start": _dt(8).isoformat(), "end": _dt(8, 30).isoformat(), "all_day": False, "summary": "Gym"}]
         suggestions = build_day_layout(events, _dt(9), _dt(18), min_gap_minutes=30)
         self.assertFalse(any(s["type"] == "exercise" for s in suggestions))
+
+
+class CalendarPairsTests(unittest.TestCase):
+    def test_pairs_ids_labels_and_accounts(self):
+        config = _config(
+            google_calendar_ids=["primary", "work@x.com"],
+            google_calendar_labels=["personal", "work"],
+            google_calendar_accounts=["personal", "work"],
+        )
+        self.assertEqual(
+            _calendar_pairs(config),
+            [("primary", "personal", "personal"), ("work@x.com", "work", "work")],
+        )
+
+    def test_short_labels_pad_with_calendar_id(self):
+        config = _config(
+            google_calendar_ids=["primary", "work@x.com"],
+            google_calendar_labels=["personal"],
+            google_calendar_accounts=["default"],
+        )
+        pairs = _calendar_pairs(config)
+        self.assertEqual(pairs[1], ("work@x.com", "work@x.com", "default"))
+
+    def test_short_accounts_pad_by_repeating_last(self):
+        config = _config(
+            google_calendar_ids=["primary", "school@x.com", "work@x.com"],
+            google_calendar_labels=["personal", "school", "work"],
+            google_calendar_accounts=["personal"],
+        )
+        pairs = _calendar_pairs(config)
+        self.assertEqual([account for _, _, account in pairs], ["personal", "personal", "personal"])
+
+    def test_single_account_default(self):
+        config = _config(
+            google_calendar_ids=["primary"],
+            google_calendar_labels=["personal"],
+        )
+        self.assertEqual(_calendar_pairs(config), [("primary", "personal", "default")])
 
 
 if __name__ == "__main__":

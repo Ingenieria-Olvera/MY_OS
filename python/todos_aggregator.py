@@ -5,7 +5,13 @@ Vault todos are plain Markdown checkboxes: `- [ ] Do the thing`. Add a due
 date with `📅 YYYY-MM-DD` (or `due: YYYY-MM-DD`), and mark something as a
 longer-running item you want to keep chipping away at — regardless of date —
 with `#ongoing`. Anything you want pinned to today's list no matter what gets
-`#today`.
+`#today`. Tag a checkbox `#personal` or `#work` to categorize it.
+
+Set `TODOS_LLM_INFERENCE=true` (see python/.env.example) to also ask the
+local Ollama agent to infer additional todos from recently-edited notes'
+prose, for things you wrote down but never turned into a checkbox. These
+come back tagged `source: "vault_inferred"` so the app can show them
+distinctly from explicit checkboxes.
 
 Run this after calendar_scraper.py and gmail_scraper.py so it can fold their
 digests in — see python/README.md.
@@ -25,10 +31,16 @@ CHECKBOX_RE = re.compile(r"^\s*-\s*\[ \]\s*(.+)$")
 DUE_DATE_RE = re.compile(r"(?:📅|due:)\s*(\d{4}-\d{2}-\d{2})", re.IGNORECASE)
 ONGOING_RE = re.compile(r"#(ongoing|overarching)\b", re.IGNORECASE)
 TODAY_TAG_RE = re.compile(r"#today\b", re.IGNORECASE)
+CATEGORY_RE = re.compile(r"#(personal|work)\b", re.IGNORECASE)
 
 
 def _stable_id(*parts: str) -> str:
     return hashlib.sha1("|".join(parts).encode("utf-8")).hexdigest()[:16]
+
+
+def _extract_category(text: str) -> Optional[str]:
+    match = CATEGORY_RE.search(text)
+    return match.group(1).lower() if match else None
 
 
 def parse_vault_todos(vault_root: str) -> List[dict]:
@@ -64,6 +76,7 @@ def parse_vault_todos(vault_root: str) -> List[dict]:
                     "due": due_match.group(1) if due_match else None,
                     "ongoing": bool(ONGOING_RE.search(text)),
                     "force_today": bool(TODAY_TAG_RE.search(text)),
+                    "category": _extract_category(text),
                     "origin": rel_path,
                 })
     return todos
@@ -88,6 +101,7 @@ def todos_from_calendar(calendar_digest: Optional[dict], today_iso: str) -> List
             "due": today_iso,
             "ongoing": False,
             "force_today": True,
+            "category": label if label in ("personal", "work") else None,
             "origin": label,
         })
     return todos
@@ -105,6 +119,7 @@ def todos_from_emails(email_digest: Optional[dict], today_iso: str) -> List[dict
             "due": today_iso,
             "ongoing": False,
             "force_today": True,
+            "category": None,
             "origin": email.get("link"),
         })
     return todos
@@ -154,6 +169,21 @@ def main() -> int:
     todos = parse_vault_todos(config.vault_root_dir)
     todos += todos_from_calendar(calendar_digest, today_iso)
     todos += todos_from_emails(email_digest, today_iso)
+
+    if config.todos_llm_inference:
+        from agent.infer_todos import infer_todos_from_notes
+
+        try:
+            todos += infer_todos_from_notes(
+                config.vault_root_dir,
+                config.ollama_host,
+                config.ollama_model,
+                limit=config.todos_llm_inference_limit,
+            )
+        except Exception as e:
+            # Ollama being unreachable/slow/wrong must never break the
+            # checkbox-parsing pipeline, which runs every few minutes via cron.
+            print(f"LLM todo inference failed, skipping: {e}", file=sys.stderr)
 
     buckets = classify(todos, today)
     write_digest(os.path.join(config.vault_inbox_dir, "todos_digest.json"), buckets)

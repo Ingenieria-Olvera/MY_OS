@@ -26,6 +26,21 @@ class ParseVaultTodosTests(unittest.TestCase):
         ongoing_todo = next(t for t in todos if "internships" in t["text"])
         self.assertTrue(ongoing_todo["ongoing"])
 
+    def test_parses_personal_and_work_category_tags(self):
+        with tempfile.TemporaryDirectory() as vault:
+            with open(os.path.join(vault, "note.md"), "w", encoding="utf-8") as f:
+                f.write(
+                    "- [ ] Call mom #personal\n"
+                    "- [ ] Ship the report #work\n"
+                    "- [ ] Untagged item\n"
+                )
+            todos = parse_vault_todos(vault)
+
+        categories = {t["text"]: t["category"] for t in todos}
+        self.assertEqual(categories["Call mom #personal"], "personal")
+        self.assertEqual(categories["Ship the report #work"], "work")
+        self.assertIsNone(categories["Untagged item"])
+
     def test_skips_inbox_folder(self):
         with tempfile.TemporaryDirectory() as vault:
             inbox = os.path.join(vault, "_inbox")
@@ -70,6 +85,17 @@ class ClassifyTests(unittest.TestCase):
 
         self.assertEqual({t["id"] for t in buckets["today"]}, {"a", "b", "f"})
         self.assertEqual({t["id"] for t in buckets["overarching"]}, {"c", "d", "e"})
+
+    def test_preserves_category_through_classification(self):
+        today = date(2026, 6, 21)
+        todos = [
+            {
+                "id": "a", "text": "work item", "due": "2026-06-21",
+                "ongoing": False, "force_today": False, "category": "work",
+            },
+        ]
+        buckets = classify(todos, today)
+        self.assertEqual(buckets["today"][0]["category"], "work")
 
 
 if __name__ == "__main__":

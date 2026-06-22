@@ -42,10 +42,8 @@ def _summarize_calendar(calendar_digest: Optional[dict]) -> str:
     return "\n".join(lines)
 
 
-def _recent_notes(vault_root: Optional[str], limit: int = 5) -> str:
-    if not vault_root or not os.path.isdir(vault_root):
-        return "No vault access configured."
-
+def _walk_notes_by_mtime(vault_root: str) -> list:
+    """(mtime, rel_path) for every vault Markdown note, newest first."""
     notes = []
     for root, dirs, files in os.walk(vault_root):
         dirs[:] = [d for d in dirs if not d.startswith(".") and d != "_inbox"]
@@ -57,9 +55,32 @@ def _recent_notes(vault_root: Optional[str], limit: int = 5) -> str:
                 notes.append((os.path.getmtime(path), os.path.relpath(path, vault_root)))
             except OSError:
                 continue
-
     notes.sort(reverse=True)
+    return notes
+
+
+def _recent_notes(vault_root: Optional[str], limit: int = 5) -> str:
+    if not vault_root or not os.path.isdir(vault_root):
+        return "No vault access configured."
+
+    notes = _walk_notes_by_mtime(vault_root)
     return "\n".join(f"- {rel}" for _, rel in notes[:limit]) or "No notes found."
+
+
+def recent_notes_with_content(vault_root: Optional[str], limit: int = 5) -> list:
+    """(rel_path, content) for the `limit` most recently-modified vault notes."""
+    if not vault_root or not os.path.isdir(vault_root):
+        return []
+
+    results = []
+    for _, rel_path in _walk_notes_by_mtime(vault_root)[:limit]:
+        path = os.path.join(vault_root, rel_path)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                results.append((rel_path, f.read()))
+        except OSError:
+            continue
+    return results
 
 
 def build_context(vault_root: Optional[str], vault_inbox_dir: Optional[str]) -> str:

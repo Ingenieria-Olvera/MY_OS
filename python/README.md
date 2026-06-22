@@ -43,31 +43,44 @@ Edit `.env`:
 
 ### Gmail + Google Calendar
 
-Both scrapers share a single OAuth client and a single cached token (see
-`common/google_auth.py`) — set this up once and both work.
+Supports one or more Google accounts (e.g. personal, uni, work) — each
+account gets its own OAuth client/token pair, but accounts can share a
+single client secret file if they're all under the same Cloud project (see
+`common/config.py`'s `google_account_triples()`).
 
 1. In [Google Cloud Console](https://console.cloud.google.com/), enable
    **both** the Gmail API and the Calendar API for one project, then create
-   an OAuth client ID of type **Desktop app**.
-2. Download its client secret JSON, save it as `credentials.json`, and point
-   `GOOGLE_CREDENTIALS_FILE` at it.
-3. Set `GOOGLE_TOKEN_FILE` to wherever you want the cached token written
-   (created on first run). The first run of *either* `gmail_scraper.py` or
-   `calendar_scraper.py` will open a browser asking you to consent to both
-   the Gmail-readonly and Calendar-readonly scopes at once; after that, both
-   scrapers refresh silently from that one token file.
+   an OAuth client ID of type **Desktop app** (one is enough even for
+   multiple accounts).
+2. Download its client secret JSON, save it as `credentials.json`.
+3. Set `GOOGLE_ACCOUNTS` to a comma-separated name per account (e.g.
+   `personal,uni,work`), `GOOGLE_CREDENTIALS_FILES` to the client secret
+   path(s) — list it once to reuse across all accounts, or one per account if
+   they use different OAuth clients — and `GOOGLE_TOKEN_FILES` to a distinct
+   cached-token path per account (created on first run). The first run
+   against each account opens a browser asking you to consent to both the
+   Gmail-readonly and Calendar-readonly scopes at once; after that, both
+   scrapers refresh silently from that account's cached token.
 4. Set `GOOGLE_CALENDAR_IDS` to your calendars (comma-separated — `primary`
-   is your main calendar; others look like
+   is the main calendar for whichever account owns it; others look like
    `xxxx@group.calendar.google.com`, found under each calendar's
-   **Settings → Integrate calendar**), and `GOOGLE_CALENDAR_LABELS` with a
-   matching label per calendar (e.g. `personal,work,school`).
+   **Settings → Integrate calendar**), `GOOGLE_CALENDAR_LABELS` with a
+   matching label per calendar (e.g. `personal,uni,work`), and
+   `GOOGLE_CALENDAR_ACCOUNT` with which `GOOGLE_ACCOUNTS` entry owns each one.
 
 ### Todos
 
 No setup beyond `VAULT_ROOT_DIR` — it scans your vault's Markdown files for
 open checkboxes (`- [ ] ...`). See `todos_aggregator.py`'s module docstring
 for the due-date/tag syntax it understands. Tag a checkbox `#hw` to have it
-surface in the app's Academics screen as outstanding homework.
+surface in the app's Academics screen as outstanding homework, and
+`#personal`/`#work` to categorize it.
+
+Set `TODOS_LLM_INFERENCE=true` to also have the local agent scan recent
+notes' prose for action items you never turned into a checkbox — these come
+back tagged `source: "vault_inferred"` so the app can show them distinctly.
+This requires Ollama (see below) and is off by default so the core
+checkbox-parsing pipeline never depends on it being reachable.
 
 ### Local agent
 
@@ -76,8 +89,9 @@ surface in the app's Academics screen as outstanding homework.
    model — anything that fits your hardware, e.g. a Jetson Nano).
 2. Set `OLLAMA_MODEL` to whatever you pulled.
 3. Leave `AGENT_HOST=127.0.0.1` if you only want to test locally, or set it
-   to `0.0.0.0` so your phone can reach it over the home network. The chat
-   endpoint is unauthenticated — only do this on a trusted home network.
+   to `0.0.0.0` so your phone can reach it over the home network (or over
+   Tailscale). The chat endpoint is unauthenticated — only do this on a
+   trusted network.
 
 ## Running
 
@@ -188,16 +202,26 @@ unit or `screen`/`tmux` session) rather than from cron:
       "text": "Standup (work) at 2026-06-20T09:00:00-04:00",
       "source": "calendar",
       "due": "2026-06-20",
+      "category": "work",
       "origin": "work"
     }
   ],
   "overarching": [
     {
       "id": "9f8e7d6c5b4a3f2e",
-      "text": "Keep applying to internships #ongoing",
+      "text": "Keep applying to internships #ongoing #work",
       "source": "vault",
       "due": null,
+      "category": "work",
       "origin": "Career/job-search.md"
+    },
+    {
+      "id": "1a2b3c4d5e6f7a8b",
+      "text": "Follow up with landlord about the lease renewal",
+      "source": "vault_inferred",
+      "due": null,
+      "category": "personal",
+      "origin": "Daily/2026-06-20.md"
     }
   ]
 }

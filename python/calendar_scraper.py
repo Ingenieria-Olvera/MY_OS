@@ -1,12 +1,14 @@
 """Fetch today's events across your Google calendars (work/personal/school,
-or however you've split them) and write a merged day-layout digest with
-suggested gaps for exercise, winding down, or studying.
+or however you've split them, possibly spanning several Google accounts) and
+write a merged day-layout digest with suggested gaps for exercise, winding
+down, or studying.
 
-Shares one `credentials.json` OAuth client and one cached token with
-gmail_scraper.py (see common/google_auth.py) — the first run of either
-script requests both scopes together, so only one browser consent is ever
-needed. See python/README.md for setup and the GOOGLE_CALENDAR_IDS /
-GOOGLE_CALENDAR_LABELS env vars used to list your calendars.
+Each configured account (see GOOGLE_ACCOUNTS in python/.env.example) shares
+its OAuth scopes with gmail_scraper.py (see common/google_auth.py) — the
+first run of either script against a given account requests both scopes
+together, so only one browser consent per account is ever needed. See
+python/README.md for setup and the GOOGLE_CALENDAR_IDS / GOOGLE_CALENDAR_LABELS
+/ GOOGLE_CALENDAR_ACCOUNT env vars used to list your calendars.
 """
 import os
 import sys
@@ -103,12 +105,19 @@ def build_day_layout(
     return suggestions
 
 
-def _calendar_pairs(config: Config) -> List[Tuple[str, str]]:
+def _calendar_pairs(config: Config) -> List[Tuple[str, str, str]]:
+    """(calendar_id, label, account) triples, positionally aligned across
+    GOOGLE_CALENDAR_IDS/GOOGLE_CALENDAR_LABELS/GOOGLE_CALENDAR_ACCOUNT. A
+    short labels list pads with the calendar id itself; a short accounts
+    list pads by repeating its last entry."""
     ids = config.google_calendar_ids
     labels = config.google_calendar_labels
+    accounts = config.google_calendar_accounts
     if len(labels) < len(ids):
         labels = labels + ids[len(labels):]
-    return list(zip(ids, labels))
+    if len(accounts) < len(ids):
+        accounts = accounts + [accounts[-1]] * (len(ids) - len(accounts))
+    return list(zip(ids, labels, accounts))
 
 
 def main() -> int:
@@ -118,20 +127,30 @@ def main() -> int:
     from common.google_auth import GOOGLE_SCOPES, load_credentials
 
     config = load_config()
-    if not config.google_credentials_file:
-        print("GOOGLE_CREDENTIALS_FILE is not set; see python/.env.example", file=sys.stderr)
-        return 1
-
-    creds = load_credentials(config.google_credentials_file, config.google_token_file, GOOGLE_SCOPES)
-    service = build("calendar", "v3", credentials=creds)
+    account_files = {account: (cf, tf) for account, cf, tf in config.google_account_triples()}
 
     now = datetime.now().astimezone()
     day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     day_end = day_start + timedelta(days=1)
 
+    services: dict = {}
     events: List[dict] = []
-    for calendar_id, label in _calendar_pairs(config):
-        events += fetch_events_for_calendar(service, calendar_id, label, day_start, day_end)
+    for calendar_id, label, account in _calendar_pairs(config):
+        if account not in services:
+            if account not in account_files:
+                print(
+                    f"Calendar '{calendar_id}' references unknown account '{account}'; "
+                    "using the first configured account instead",
+                    file=sys.stderr,
+                )
+            creds_file, token_file = account_files.get(account, next(iter(account_files.values())))
+            creds = load_credentials(creds_file, token_file, GOOGLE_SCOPES)
+            services[account] = build("calendar", "v3", credentials=creds)
+
+        for event in fetch_events_for_calendar(services[account], calendar_id, label, day_start, day_end):
+            event["account"] = account
+            events.append(event)
+
     events.sort(key=lambda e: e["start"])
 
     suggestions = build_day_layout(events, max(day_start, now), day_end, config.calendar_min_gap_minutes)
