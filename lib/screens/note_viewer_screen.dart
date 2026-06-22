@@ -34,7 +34,7 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
   }
 
   String get _title {
-    final name = widget.file.path.split('/').last;
+    final name = widget.file.path.replaceAll('\\', '/').split('/').last;
     return name.endsWith('.md') ? name.substring(0, name.length - 3) : name;
   }
 

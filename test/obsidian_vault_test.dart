@@ -27,7 +27,7 @@ void main() {
       final index = VaultIndex();
       await index.build(tempDir);
       final resolved = index.resolveLink('Note B');
-      expect(resolved?.path, '${tempDir.path}/sub/Note B.md');
+      expect(resolved?.path.replaceAll('\\', '/'), '${tempDir.path}/sub/Note B.md'.replaceAll('\\', '/'));
     });
 
     test('computes backlinks for a note', () async {

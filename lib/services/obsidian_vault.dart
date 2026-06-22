@@ -77,13 +77,15 @@ class VaultIndex {
 
   List<VaultNote> backlinksFor(File file) {
     final targetKey = _basenameNoExt(file.path).toLowerCase();
+    final normalizedFilePath = file.path.replaceAll('\\', '/');
     return _notesByPath.values
-        .where((n) => n.file.path != file.path && n.linkTargets.any((t) => t.toLowerCase() == targetKey))
+        .where((n) => n.file.path.replaceAll('\\', '/') != normalizedFilePath && n.linkTargets.any((t) => t.toLowerCase() == targetKey))
         .toList();
   }
 
   static String _basenameNoExt(String path) {
-    final name = path.split('/').last;
+    final normalized = path.replaceAll('\\', '/');
+    final name = normalized.split('/').last;
     return name.endsWith('.md') ? name.substring(0, name.length - 3) : name;
   }
 }
