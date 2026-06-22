@@ -1,15 +1,15 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../services/obsidian_vault.dart';
+import '../services/vault_access.dart';
 import '../theme/app_theme.dart';
 import 'tag_notes_screen.dart';
 
 class NoteViewerScreen extends StatefulWidget {
-  final File file;
+  final VaultEntry entry;
   final VaultIndex index;
 
-  const NoteViewerScreen({super.key, required this.file, required this.index});
+  const NoteViewerScreen({super.key, required this.entry, required this.index});
 
   @override
   State<NoteViewerScreen> createState() => _NoteViewerScreenState();
@@ -26,21 +26,21 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
   }
 
   Future<void> _load() async {
-    final raw = await widget.file.readAsString();
+    final raw = await VaultAccess.readAsString(widget.entry.uri);
     setState(() {
-      _content = raw;
+      _content = raw ?? '';
       _isLoading = false;
     });
   }
 
   String get _title {
-    final name = widget.file.path.replaceAll('\\', '/').split('/').last;
+    final name = widget.entry.name;
     return name.endsWith('.md') ? name.substring(0, name.length - 3) : name;
   }
 
   @override
   Widget build(BuildContext context) {
-    final backlinks = widget.index.backlinksFor(widget.file);
+    final backlinks = widget.index.backlinksFor(widget.entry);
 
     return Scaffold(
       appBar: AppBar(title: Text(_title)),
@@ -86,7 +86,7 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
                           title: Text(n.title, style: const TextStyle(color: AppTheme.textPrimary)),
                           onTap: () => Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => NoteViewerScreen(file: n.file, index: widget.index)),
+                            MaterialPageRoute(builder: (_) => NoteViewerScreen(entry: n.entry, index: widget.index)),
                           ),
                         )),
                   ],
@@ -101,9 +101,9 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
 
     if (href.startsWith('wikilink:')) {
       final target = Uri.decodeComponent(href.substring('wikilink:'.length));
-      final file = widget.index.resolveLink(target);
-      if (file != null) {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => NoteViewerScreen(file: file, index: widget.index)));
+      final entry = widget.index.resolveLink(target);
+      if (entry != null) {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => NoteViewerScreen(entry: entry, index: widget.index)));
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Note "$target" not found in vault')),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/academics_provider.dart';
+import '../providers/todos_provider.dart';
 import '../theme/app_theme.dart';
 
 class AcademicsScreen extends StatelessWidget {
@@ -19,6 +20,10 @@ class AcademicsScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _buildOverviewCards(provider),
+                const SizedBox(height: 24),
+                _buildGoalCard(context, provider),
+                const SizedBox(height: 24),
+                _buildHomeworkSection(),
                 const SizedBox(height: 32),
                 const Text('CURRENT COURSES', style: TextStyle(color: AppTheme.accentPurple, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 2.0)),
                 const SizedBox(height: 16),
@@ -138,6 +143,152 @@ class AcademicsScreen extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildGoalCard(BuildContext context, AcademicsProvider provider) {
+    final required = provider.requiredAverageGradePoints;
+    return GestureDetector(
+      onTap: () => _showEditGoalDialog(context, provider),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withOpacity(0.05)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'GPA GOAL',
+                  style: TextStyle(color: AppTheme.accentPurple, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 2.0),
+                ),
+                const Icon(Icons.edit, color: AppTheme.textSecondary, size: 16),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (provider.remainingCredits <= 0)
+              const Text(
+                'Set a target GPA and remaining credits to see the path to get there.',
+                style: TextStyle(color: AppTheme.textSecondary),
+              )
+            else
+              Text(
+                required == null
+                    ? ''
+                    : 'Average ${required.toStringAsFixed(2)} grade points across your remaining '
+                        '${provider.remainingCredits.toStringAsFixed(0)} credits to hit ${provider.targetGPA.toStringAsFixed(2)} GPA.',
+                style: TextStyle(
+                  color: provider.isGoalAchievable ? AppTheme.statusGreen : AppTheme.statusRed,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditGoalDialog(BuildContext context, AcademicsProvider provider) {
+    final targetController = TextEditingController(text: provider.targetGPA.toString());
+    final creditsController = TextEditingController(text: provider.remainingCredits.toString());
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: const Text('Set GPA Goal', style: TextStyle(color: AppTheme.textPrimary)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: targetController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(color: AppTheme.textPrimary),
+              decoration: const InputDecoration(labelText: 'Target GPA', labelStyle: TextStyle(color: AppTheme.textSecondary)),
+            ),
+            TextField(
+              controller: creditsController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(color: AppTheme.textPrimary),
+              decoration: const InputDecoration(labelText: 'Remaining credits', labelStyle: TextStyle(color: AppTheme.textSecondary)),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () {
+              final target = double.tryParse(targetController.text) ?? provider.targetGPA;
+              final credits = double.tryParse(creditsController.text) ?? provider.remainingCredits;
+              provider.setGoal(target, credits);
+              Navigator.pop(context);
+            },
+            child: const Text('Save', style: TextStyle(color: AppTheme.accentPurple)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Homework left, pulled from the same vault/todos digest pipeline —
+  /// tag a checkbox `#hw` in the vault to have it show up here.
+  Widget _buildHomeworkSection() {
+    return Consumer<TodosProvider>(
+      builder: (context, todos, child) {
+        final homework = [...todos.pendingToday, ...todos.pendingOverarching]
+            .where((t) => t.text.toLowerCase().contains('#hw'))
+            .toList();
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withOpacity(0.05)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'HOMEWORK LEFT',
+                style: TextStyle(color: AppTheme.accentPurple, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 2.0),
+              ),
+              const SizedBox(height: 12),
+              if (homework.isEmpty)
+                const Text(
+                  'Nothing tagged #hw is outstanding. Tag a vault checkbox with #hw to track it here.',
+                  style: TextStyle(color: AppTheme.textSecondary),
+                )
+              else
+                ...homework.map((t) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.menu_book_outlined, color: AppTheme.textSecondary, size: 18),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              t.text,
+                              style: const TextStyle(color: AppTheme.textPrimary),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (t.due != null)
+                            Text(t.due!, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                        ],
+                      ),
+                    )),
+            ],
+          ),
+        );
+      },
     );
   }
 

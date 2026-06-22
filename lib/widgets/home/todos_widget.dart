@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/todos_provider.dart';
+import '../../services/todos_service.dart';
 import '../../theme/app_theme.dart';
 
 class TodosWidget extends StatefulWidget {
@@ -9,51 +12,53 @@ class TodosWidget extends StatefulWidget {
 }
 
 class _TodosWidgetState extends State<TodosWidget> {
-  int _tabIndex = 0; // 0 = Today, 1 = Tomorrow, 2 = Important, 3 = Projects
+  int _tabIndex = 0; // 0 = Today, 1 = Important/Overarching
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'TASKS & PROJECTS',
-            style: TextStyle(
-              color: AppTheme.accentPurple,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 2.0,
-            ),
+    return Consumer<TodosProvider>(
+      builder: (context, provider, child) {
+        final items = _tabIndex == 0 ? provider.pendingToday : provider.pendingOverarching;
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withOpacity(0.05)),
           ),
-          const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _buildTab(0, 'Today'),
-                const SizedBox(width: 8),
-                _buildTab(1, 'Tomorrow'),
-                const SizedBox(width: 8),
-                _buildTab(2, 'Important'),
-                const SizedBox(width: 8),
-                _buildTab(3, 'Projects'),
-              ],
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'TODOS',
+                style: TextStyle(
+                  color: AppTheme.accentPurple,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 2.0,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _buildTab(0, 'Today'),
+                  const SizedBox(width: 16),
+                  _buildTab(1, 'Overarching'),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (provider.isLoading)
+                const Text('Loading…', style: TextStyle(color: AppTheme.textSecondary))
+              else if (items.isEmpty)
+                const Text('Nothing here — nice.', style: TextStyle(color: AppTheme.textSecondary))
+              else
+                Column(
+                  children: items.map((item) => _buildTodoRow(provider, item)).toList(),
+                ),
+            ],
           ),
-          const SizedBox(height: 16),
-          if (_tabIndex == 0) _buildTodoList('Today\'s List (Isar syncing...)'),
-          if (_tabIndex == 1) _buildTodoList('Tomorrow\'s List (Rolls over at midnight)'),
-          if (_tabIndex == 2) _buildTodoList('Important Tasks (Flagged)'),
-          if (_tabIndex == 3) _buildTodoList('Project Hierarchies'),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -72,23 +77,35 @@ class _TodosWidgetState extends State<TodosWidget> {
     );
   }
 
-  Widget _buildTodoList(String placeholderText) {
-    return Column(
-      children: [
-        Row(
+  Widget _buildTodoRow(TodosProvider provider, TodoItem item) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: GestureDetector(
+        onTap: () => provider.toggleCompleted(item.id),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Icon(Icons.check_circle_outline, color: AppTheme.textSecondary, size: 20),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                placeholderText, 
-                style: const TextStyle(color: AppTheme.textPrimary),
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.text,
+                    style: const TextStyle(color: AppTheme.textPrimary),
+                  ),
+                  if (item.origin.isNotEmpty)
+                    Text(
+                      item.due != null ? '${item.origin} · due ${item.due}' : item.origin,
+                      style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                    ),
+                ],
               ),
             ),
           ],
         ),
-      ],
+      ),
     );
   }
 }

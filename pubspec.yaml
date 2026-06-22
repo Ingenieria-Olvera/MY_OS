@@ -15,27 +15,35 @@ dependencies:
 
   # Local filesystem access — reading the .md vault
   path_provider: ^2.1.5
-  permission_handler: ^11.3.1
 
-  # Google Calendar API & Auth
-  google_sign_in: ^6.2.1
-  googleapis: ^13.1.0
+  # Storage Access Framework — lets the user pick the synced vault folder
+  # once and grants persisted access to just that folder, so the app never
+  # needs broad storage permissions.
+  saf_util: ^3.1.0
+  saf_stream: ^3.0.0
 
-  # Market Data (Using http to fetch from Yahoo Finance API directly)
+  # Market Data (Using http to fetch from Yahoo Finance API directly, and to
+  # talk to the local Ollama agent over the home network)
   http: ^1.2.0
 
-  # Samsung Health / Google Fit
+  # Local reminders for due todos and time-sensitive emails/calendar events.
+  flutter_local_notifications: ^22.0.1
+  timezone: ^0.11.0
+
+  # Samsung Health / Google Fit — Health Connect access has to happen
+  # on-device, so unlike Calendar/Slack/Gmail this isn't moved to a Python
+  # scraper.
   health: ^11.0.0
 
-  # Local persistence for overrides
+  # Local persistence: digest read-state, todo completion, financial goal
+  # overrides, chat history. Google Calendar is now read from
+  # calendar_digest.json (written by python/calendar_scraper.py) instead of
+  # a live in-app OAuth call, so google_sign_in/googleapis are no longer
+  # needed here.
   shared_preferences: ^2.2.3
 
   # Render plain-text Markdown from the vault
   flutter_markdown: ^0.7.6
-
-  # Offline Isar database for metrics tracking
-  isar: ^3.1.0+1
-  isar_flutter_libs: ^3.1.0+1
 
   # Lightweight state management
   provider: ^6.1.2
@@ -47,10 +55,6 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-
-  # Isar code generation
-  isar_generator: ^3.1.0+1
-  build_runner: ^2.4.13
 
 flutter:
   uses-material-design: true

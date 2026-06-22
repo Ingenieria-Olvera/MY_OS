@@ -29,7 +29,7 @@ class TagNotesScreen extends StatelessWidget {
                   title: Text(note.title, style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold)),
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => NoteViewerScreen(file: note.file, index: index)),
+                    MaterialPageRoute(builder: (_) => NoteViewerScreen(entry: note.entry, index: index)),
                   ),
                 );
               },

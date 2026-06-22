@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/vault_paths.dart';
@@ -36,9 +35,9 @@ class InboxProvider extends ChangeNotifier {
   Future<void> refresh() async {
     isLoading = true;
     notifyListeners();
-    final inboxDir = Directory(vaultInboxPath);
-    slackMessages = await InboxDigest.readSlackMessages(inboxDir);
-    emails = await InboxDigest.readEmails(inboxDir);
+    final inboxUri = await resolveVaultInboxUri();
+    slackMessages = await InboxDigest.readSlackMessages(inboxUri);
+    emails = await InboxDigest.readEmails(inboxUri);
     isLoading = false;
     notifyListeners();
   }

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_os/providers/dashboard_provider.dart';
 import 'package:my_os/providers/inbox_provider.dart';
+import 'package:my_os/providers/todos_provider.dart';
 import 'package:my_os/services/inbox_service.dart';
 import 'package:my_os/widgets/home/todos_widget.dart';
 import 'package:my_os/widgets/home/financial_goals_widget.dart';
@@ -20,7 +22,14 @@ void main() {
   }
 
   testWidgets('TodosWidget does not overflow on a narrow screen', (tester) async {
-    await pumpOnNarrowScreen(tester, const TodosWidget());
+    final provider = FakeTodosProvider();
+    await pumpOnNarrowScreen(
+      tester,
+      ChangeNotifierProvider<TodosProvider>.value(
+        value: provider,
+        child: const TodosWidget(),
+      ),
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -44,8 +53,7 @@ void main() {
   });
 
   testWidgets('InboxScreen does not overflow with long sender/subject text', (tester) async {
-    final provider = InboxProvider();
-    provider.isLoading = false;
+    final provider = FakeInboxProvider();
     provider.slackMessages = [
       SlackMessage(
         id: '1',
@@ -78,4 +86,26 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
+}
+
+class FakeTodosProvider extends TodosProvider {
+  FakeTodosProvider() {
+    isLoading = false;
+    today = [];
+    overarching = [];
+  }
+  @override
+  Future<void> refresh() async {}
+  @override
+  Future<void> _loadCompletedIds() async {}
+}
+
+class FakeInboxProvider extends InboxProvider {
+  FakeInboxProvider() {
+    isLoading = false;
+  }
+  @override
+  Future<void> refresh() async {}
+  @override
+  Future<void> _loadReadIds() async {}
 }
