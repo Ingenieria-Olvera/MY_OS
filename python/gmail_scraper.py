@@ -1,9 +1,11 @@
 """Fetch important/unread Gmail messages and write them to the vault inbox
 as JSON for the MY OS app to read.
 
-First run requires interactive OAuth consent (a browser window opens); after
-that the refresh token is cached in GMAIL_TOKEN_FILE so subsequent (e.g.
-cron) runs are non-interactive. See python/README.md for setup.
+Shares one `credentials.json` OAuth client and one cached token with
+calendar_scraper.py (see common/google_auth.py) — the first run of either
+script requests both scopes together, so only one browser consent is ever
+needed. After that the cached token in GOOGLE_TOKEN_FILE makes subsequent
+(e.g. cron) runs of both scrapers non-interactive. See python/README.md.
 """
 import os
 import sys
@@ -14,9 +16,7 @@ from googleapiclient.discovery import build
 
 from common.config import load_config
 from common.digest_writer import write_digest
-from common.google_auth import load_credentials
-
-SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+from common.google_auth import GOOGLE_SCOPES, load_credentials
 
 
 def _header(headers: List[dict], name: str) -> str:
@@ -57,11 +57,11 @@ def fetch_important_emails(service, query: str, max_results: int) -> List[dict]:
 
 def main() -> int:
     config = load_config()
-    if not config.gmail_client_secret_file:
-        print("GMAIL_CLIENT_SECRET_FILE is not set; see python/.env.example", file=sys.stderr)
+    if not config.google_credentials_file:
+        print("GOOGLE_CREDENTIALS_FILE is not set; see python/.env.example", file=sys.stderr)
         return 1
 
-    creds = load_credentials(config.gmail_client_secret_file, config.gmail_token_file, SCOPES)
+    creds = load_credentials(config.google_credentials_file, config.google_token_file, GOOGLE_SCOPES)
     service = build("gmail", "v1", credentials=creds)
 
     emails = fetch_important_emails(service, config.gmail_query, config.gmail_max_results)

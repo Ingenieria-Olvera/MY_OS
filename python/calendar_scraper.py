@@ -2,10 +2,11 @@
 or however you've split them) and write a merged day-layout digest with
 suggested gaps for exercise, winding down, or studying.
 
-Reuses the same OAuth client as gmail_scraper.py by default (set
-GOOGLE_CALENDAR_CLIENT_SECRET_FILE to override) — see python/README.md for
-setup and the GOOGLE_CALENDAR_IDS / GOOGLE_CALENDAR_LABELS env vars used to
-list your calendars.
+Shares one `credentials.json` OAuth client and one cached token with
+gmail_scraper.py (see common/google_auth.py) — the first run of either
+script requests both scopes together, so only one browser consent is ever
+needed. See python/README.md for setup and the GOOGLE_CALENDAR_IDS /
+GOOGLE_CALENDAR_LABELS env vars used to list your calendars.
 """
 import os
 import sys
@@ -14,8 +15,6 @@ from typing import List, Tuple
 
 from common.config import Config, load_config
 from common.digest_writer import write_digest
-
-SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 
 def fetch_events_for_calendar(
@@ -116,19 +115,14 @@ def main() -> int:
     # Imported lazily: these pull in network/crypto libs only needed here,
     # not by the pure scheduling logic above (which is unit tested).
     from googleapiclient.discovery import build
-    from common.google_auth import load_credentials
+    from common.google_auth import GOOGLE_SCOPES, load_credentials
 
     config = load_config()
-    client_secret_file = config.google_calendar_client_secret_file or config.gmail_client_secret_file
-    if not client_secret_file:
-        print(
-            "GOOGLE_CALENDAR_CLIENT_SECRET_FILE (or GMAIL_CLIENT_SECRET_FILE) is not set; "
-            "see python/.env.example",
-            file=sys.stderr,
-        )
+    if not config.google_credentials_file:
+        print("GOOGLE_CREDENTIALS_FILE is not set; see python/.env.example", file=sys.stderr)
         return 1
 
-    creds = load_credentials(client_secret_file, config.google_calendar_token_file, SCOPES)
+    creds = load_credentials(config.google_credentials_file, config.google_token_file, GOOGLE_SCOPES)
     service = build("calendar", "v3", credentials=creds)
 
     now = datetime.now().astimezone()

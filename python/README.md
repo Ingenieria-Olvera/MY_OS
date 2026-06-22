@@ -41,23 +41,22 @@ Edit `.env`:
 3. Install the app to your workspace and copy the **User OAuth Token**
    (starts with `xoxp-`) into `SLACK_USER_TOKEN`.
 
-### Gmail
+### Gmail + Google Calendar
 
-1. In [Google Cloud Console](https://console.cloud.google.com/), enable the
-   Gmail API for a project and create an OAuth client ID of type
-   **Desktop app**.
-2. Download its client secret JSON and point `GMAIL_CLIENT_SECRET_FILE` at
-   it.
-3. Set `GMAIL_TOKEN_FILE` to wherever you want the refresh token cached
-   (created on first run).
+Both scrapers share a single OAuth client and a single cached token (see
+`common/google_auth.py`) — set this up once and both work.
 
-### Google Calendar
-
-1. In the same Google Cloud project, enable the **Calendar API**.
-2. By default the calendar scraper reuses `GMAIL_CLIENT_SECRET_FILE`; set
-   `GOOGLE_CALENDAR_CLIENT_SECRET_FILE` instead if you'd rather use a
-   separate OAuth client.
-3. Set `GOOGLE_CALENDAR_IDS` to your calendars (comma-separated — `primary`
+1. In [Google Cloud Console](https://console.cloud.google.com/), enable
+   **both** the Gmail API and the Calendar API for one project, then create
+   an OAuth client ID of type **Desktop app**.
+2. Download its client secret JSON, save it as `credentials.json`, and point
+   `GOOGLE_CREDENTIALS_FILE` at it.
+3. Set `GOOGLE_TOKEN_FILE` to wherever you want the cached token written
+   (created on first run). The first run of *either* `gmail_scraper.py` or
+   `calendar_scraper.py` will open a browser asking you to consent to both
+   the Gmail-readonly and Calendar-readonly scopes at once; after that, both
+   scrapers refresh silently from that one token file.
+4. Set `GOOGLE_CALENDAR_IDS` to your calendars (comma-separated — `primary`
    is your main calendar; others look like
    `xxxx@group.calendar.google.com`, found under each calendar's
    **Settings → Integrate calendar**), and `GOOGLE_CALENDAR_LABELS` with a

@@ -26,8 +26,8 @@ class Config:
     vault_inbox_dir: str
     slack_user_token: Optional[str]
     slack_lookback_hours: int
-    gmail_client_secret_file: Optional[str]
-    gmail_token_file: str
+    google_credentials_file: Optional[str]
+    google_token_file: str
     gmail_query: str
     gmail_max_results: int
 
@@ -35,11 +35,9 @@ class Config:
     # aggregator and the local agent to read your notes.
     vault_root_dir: Optional[str] = None
 
-    # Google Calendar — by default reuses the Gmail OAuth client, since it's
-    # usually the same Google Cloud project; override if you'd rather use a
-    # separate one.
-    google_calendar_client_secret_file: Optional[str] = None
-    google_calendar_token_file: str = "google_calendar_token.json"
+    # Google Calendar — same OAuth client and cached token as Gmail (see
+    # common/google_auth.py); both scopes are requested together so one
+    # consent screen covers both scrapers.
     google_calendar_ids: List[str] = field(default_factory=lambda: ["primary"])
     google_calendar_labels: List[str] = field(default_factory=lambda: ["personal"])
     calendar_min_gap_minutes: int = 30
@@ -63,13 +61,11 @@ def load_config() -> Config:
         vault_inbox_dir=vault_inbox_dir,
         slack_user_token=os.environ.get("SLACK_USER_TOKEN"),
         slack_lookback_hours=int(os.environ.get("SLACK_LOOKBACK_HOURS", "24")),
-        gmail_client_secret_file=os.environ.get("GMAIL_CLIENT_SECRET_FILE"),
-        gmail_token_file=os.environ.get("GMAIL_TOKEN_FILE", "gmail_token.json"),
+        google_credentials_file=os.environ.get("GOOGLE_CREDENTIALS_FILE", "credentials.json"),
+        google_token_file=os.environ.get("GOOGLE_TOKEN_FILE", "google_token.json"),
         gmail_query=os.environ.get("GMAIL_QUERY", "is:unread is:important"),
         gmail_max_results=int(os.environ.get("GMAIL_MAX_RESULTS", "25")),
         vault_root_dir=os.environ.get("VAULT_ROOT_DIR"),
-        google_calendar_client_secret_file=os.environ.get("GOOGLE_CALENDAR_CLIENT_SECRET_FILE"),
-        google_calendar_token_file=os.environ.get("GOOGLE_CALENDAR_TOKEN_FILE", "google_calendar_token.json"),
         google_calendar_ids=_csv_env("GOOGLE_CALENDAR_IDS", ["primary"]),
         google_calendar_labels=_csv_env("GOOGLE_CALENDAR_LABELS", ["personal"]),
         calendar_min_gap_minutes=int(os.environ.get("CALENDAR_MIN_GAP_MINUTES", "30")),
