@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_os/providers/dashboard_provider.dart';
 import 'package:my_os/providers/inbox_provider.dart';
 import 'package:my_os/providers/todos_provider.dart';

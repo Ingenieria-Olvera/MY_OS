@@ -10,9 +10,8 @@ class InboxProvider extends ChangeNotifier {
   List<EmailMessage> emails = [];
   bool isLoading = true;
   Set<String> _readIds = {};
-
   InboxProvider() {
-    _loadReadIds().then((_) => refresh());
+    _loadReadIds();
   }
 
   bool isRead(String id) => _readIds.contains(id);

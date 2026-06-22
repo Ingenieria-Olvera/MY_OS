@@ -84,7 +84,7 @@ class AcademicsScreen extends StatelessWidget {
                   const Text('Past Course?', style: TextStyle(color: AppTheme.textPrimary)),
                   Switch(
                     value: isPast,
-                    activeColor: AppTheme.accentPurple,
+                    activeThumbColor: AppTheme.accentPurple,
                     onChanged: (val) => setState(() => isPast = val),
                   ),
                 ],
@@ -328,7 +328,7 @@ class AcademicsScreen extends StatelessWidget {
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: courses.length,
-        separatorBuilder: (_, __) => Divider(color: Colors.white.withOpacity(0.05), height: 1),
+        separatorBuilder: (_, _) => Divider(color: Colors.white.withOpacity(0.05), height: 1),
         itemBuilder: (context, index) {
           final course = courses[index];
           return ListTile(
