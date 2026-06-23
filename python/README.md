@@ -150,6 +150,32 @@ This is the same code path as running each script by hand, just looped —
 one scraper failing (bad token, no network) is logged and skipped, it won't
 stop the others or the loop. See `agent/scheduler.py`.
 
+To also get a refresh immediately on wake/unlock (rather than waiting for
+the next interval tick), register `run_once.py` — which runs the same
+scrapers a single time then exits — as a Task Scheduler task triggered "On
+workstation unlock":
+
+```powershell
+$action = New-ScheduledTaskAction -Execute "C:\path\to\.venv\Scripts\python.exe" `
+    -Argument "C:\path\to\MY_OS\python\run_once.py" -WorkingDirectory "C:\path\to\MY_OS\python"
+$trigger = New-ScheduledTaskTrigger -AtLogOn
+Register-ScheduledTask -TaskName "MyOS-ScrapeOnUnlock" -Action $action -Trigger $trigger
+```
+
+(`-AtLogOn` covers sign-in; Task Scheduler's GUI also offers an explicit "On
+workstation unlock" trigger under the task's Triggers tab if you want both.)
+Keep `agent/server.py` running too — it covers the periodic interval, this
+just adds an immediate refresh on wake.
+
+### Reaching the agent over Tailscale
+
+If the agent (`agent/server.py`) runs on a laptop you're not always on the
+same Wi-Fi as, set `AGENT_HOST=0.0.0.0` (or your Tailscale IP) in `.env` and
+point the app's agent base URL at `http://<tailscale-ip>:8765` instead of a
+LAN address. Tailscale's own encryption means you don't need to additionally
+authenticate `/chat` or `/feedback` — just don't expose the port outside the
+tailnet.
+
 ## Output format
 
 `<VAULT_INBOX_DIR>/slack_digest.json`:

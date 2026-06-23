@@ -43,6 +43,7 @@ class EmailMessage {
   final DateTime? receivedAt;
   final List<String> labels;
   final String? link;
+  final String? account; // which Google account this came from, if multi-account
 
   EmailMessage({
     required this.id,
@@ -52,6 +53,7 @@ class EmailMessage {
     required this.receivedAt,
     required this.labels,
     this.link,
+    this.account,
   });
 
   factory EmailMessage.fromJson(Map<String, dynamic> data) {
@@ -64,6 +66,7 @@ class EmailMessage {
       receivedAt: receivedAtRaw == null ? null : DateTime.tryParse(receivedAtRaw),
       labels: (data['labels'] as List<dynamic>? ?? const []).cast<String>(),
       link: data['link'] as String?,
+      account: data['account'] as String?,
     );
   }
 }

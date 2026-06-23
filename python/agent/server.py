@@ -8,8 +8,10 @@ the default is localhost-only.
 import json
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import Optional
 
 from agent import scheduler
+from agent.feedback import record_feedback
 from agent.ollama_client import OllamaError, generate
 from agent.vault_context import build_context
 from common.config import Config, load_config
@@ -33,14 +35,23 @@ class ChatHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self) -> None:
-        if self.path != "/chat":
+        if self.path == "/chat":
+            self._handle_chat()
+        elif self.path == "/feedback":
+            self._handle_feedback()
+        else:
             self._send_json(404, {"error": "not found"})
-            return
 
+    def _read_json_body(self) -> Optional[dict]:
         length = int(self.headers.get("Content-Length", "0"))
         try:
-            payload = json.loads(self.rfile.read(length) or b"{}")
+            return json.loads(self.rfile.read(length) or b"{}")
         except json.JSONDecodeError:
+            return None
+
+    def _handle_chat(self) -> None:
+        payload = self._read_json_body()
+        if payload is None:
             self._send_json(400, {"error": "invalid JSON body"})
             return
 
@@ -59,6 +70,35 @@ class ChatHandler(BaseHTTPRequestHandler):
             return
 
         self._send_json(200, {"reply": reply.strip()})
+
+    def _handle_feedback(self) -> None:
+        """Logs a correction to a suggested category/urgency (with an
+        optional free-text reason) to `Feedback Log.md` in the vault — the
+        app's "why wasn't this right" input lands here. See agent/feedback.py."""
+        if not self.config.vault_root_dir:
+            self._send_json(500, {"error": "VAULT_ROOT_DIR is not set"})
+            return
+
+        payload = self._read_json_body()
+        if payload is None:
+            self._send_json(400, {"error": "invalid JSON body"})
+            return
+
+        text = (payload.get("text") or "").strip()
+        if not text:
+            self._send_json(400, {"error": "'text' is required"})
+            return
+
+        record_feedback(
+            self.config.vault_root_dir,
+            text,
+            payload.get("suggested_category"),
+            payload.get("chosen_category"),
+            payload.get("suggested_urgency"),
+            payload.get("chosen_urgency"),
+            payload.get("reason"),
+        )
+        self._send_json(200, {"ok": True})
 
     def log_message(self, format: str, *args) -> None:
         sys.stderr.write("agent: " + (format % args) + "\n")

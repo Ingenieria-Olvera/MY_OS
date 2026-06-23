@@ -1,16 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/vault_paths.dart';
+import '../services/agent_service.dart';
 import '../services/todos_service.dart';
 import '../services/vault_access.dart';
 
 class TodosProvider extends ChangeNotifier {
   static const _completedIdsKey = 'todos_completed_ids';
+  // Same SharedPreferences key ChatProvider stores the agent's base URL
+  // under (see lib/providers/chat_provider.dart) — one Settings field
+  // backs both /chat and /feedback.
+  static const _agentBaseUrlKey = 'agent_base_url';
 
   List<TodoItem> today = [];
   List<TodoItem> overarching = [];
   bool isLoading = true;
   Set<String> _completedIds = {};
+  // Manually-added todos not yet confirmed by the next digest fetch (see
+  // refresh()) — kept here so addTodo() can show them optimistically and
+  // refresh() can drop them once todos_aggregator.py has parsed the same
+  // checkbox and they appear in the fetched digest by stable id.
+  final List<TodoItem> _pendingToday = [];
+  final List<TodoItem> _pendingOverarching = [];
   TodosProvider() {
     _loadCompletedIds();
   }
@@ -64,6 +75,36 @@ class TodosProvider extends ChangeNotifier {
     }
     notifyListeners();
     return true;
+  }
+
+  /// Sends a category/urgency correction (plus an optional free-text reason)
+  /// for [item] to the local agent's `/feedback` endpoint. Returns false if
+  /// no agent base URL is configured (Settings) or the request fails, so the
+  /// caller can show a snackbar without throwing.
+  Future<bool> submitFeedback({
+    required TodoItem item,
+    String? chosenCategory,
+    String? chosenUrgency,
+    String? reason,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final baseUrl = prefs.getString(_agentBaseUrlKey) ?? '';
+    if (baseUrl.isEmpty) return false;
+
+    try {
+      await AgentService.sendFeedback(
+        baseUrl,
+        text: item.text,
+        suggestedCategory: item.category,
+        chosenCategory: chosenCategory,
+        suggestedUrgency: item.urgency,
+        chosenUrgency: chosenUrgency,
+        reason: reason,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> toggleCompleted(String id) async {
