@@ -8,7 +8,7 @@ import 'providers/calendar_provider.dart';
 import 'providers/todos_provider.dart';
 import 'providers/chat_provider.dart';
 import 'screens/dashboard_screen.dart';
-import 'screens/academics_screen.dart';
+import 'screens/chat_screen.dart';
 import 'screens/todos_screen.dart';
 import 'screens/inbox_screen.dart';
 import 'screens/more_screen.dart';
@@ -117,9 +117,9 @@ class _MainShellState extends State<MainShell> {
 
   final List<Widget> _screens = [
     const DashboardScreen(),
+    const ChatScreen(),
     const TodosScreen(),
     const InboxScreen(),
-    const AcademicsScreen(),
     const MoreScreen(),
   ];
 
@@ -141,6 +141,11 @@ class _MainShellState extends State<MainShell> {
             label: 'Today',
           ),
           BottomNavigationBarItem(
+            icon: Icon(Icons.auto_awesome_outlined),
+            activeIcon: Icon(Icons.auto_awesome),
+            label: 'Secretary',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.check_circle_outline),
             activeIcon: Icon(Icons.check_circle),
             label: 'Todos',
@@ -149,11 +154,6 @@ class _MainShellState extends State<MainShell> {
             icon: Icon(Icons.inbox_outlined),
             activeIcon: Icon(Icons.inbox),
             label: 'Inbox',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.school_outlined),
-            activeIcon: Icon(Icons.school),
-            label: 'Academics',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.more_horiz),

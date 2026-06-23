@@ -1,8 +1,10 @@
 import '../constants/vault_paths.dart';
+import 'digest_fetcher.dart';
 import 'vault_access.dart';
 
 /// A single calendar event surfaced by `python/calendar_scraper.py`.
 class CalendarEvent {
+  final String id;
   final String label; // 'personal' | 'work' | 'school'
   final String? account; // which Google account this came from, if multi-account
   final String summary;
@@ -11,6 +13,7 @@ class CalendarEvent {
   final bool allDay;
 
   CalendarEvent({
+    required this.id,
     required this.label,
     this.account,
     required this.summary,
@@ -21,6 +24,7 @@ class CalendarEvent {
 
   factory CalendarEvent.fromJson(Map<String, dynamic> data) {
     return CalendarEvent(
+      id: data['id'] as String? ?? '',
       label: data['label'] as String? ?? '',
       account: data['account'] as String?,
       summary: data['summary'] as String? ?? '(untitled)',
@@ -81,10 +85,6 @@ class CalendarDigest {
   }
 
   static Future<Map<String, dynamic>?> _readDigest(String? inboxUri) async {
-    final uri = inboxUri ?? await resolveVaultInboxUri();
-    if (uri == null) return null;
-    final fileEntry = await VaultAccess.child(uri, 'calendar_digest.json');
-    if (fileEntry == null) return null;
-    return VaultAccess.readJson(fileEntry.uri);
+    return DigestFetcher.read('calendar', 'calendar_digest.json', inboxUri);
   }
 }

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 
 import '../constants/vault_paths.dart';
+import 'digest_fetcher.dart';
 import 'vault_access.dart';
 
 /// The vault-root note that manually-added todos are appended to as plain
@@ -80,10 +81,6 @@ class TodosDigest {
   }
 
   static Future<Map<String, dynamic>?> _readDigest(String? inboxUri) async {
-    final uri = inboxUri ?? await resolveVaultInboxUri();
-    if (uri == null) return null;
-    final fileEntry = await VaultAccess.child(uri, 'todos_digest.json');
-    if (fileEntry == null) return null;
-    return VaultAccess.readJson(fileEntry.uri);
+    return DigestFetcher.read('todos', 'todos_digest.json', inboxUri);
   }
 }

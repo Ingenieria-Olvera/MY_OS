@@ -27,6 +27,10 @@ from typing import List, Optional
 from common.config import load_config
 from common.digest_writer import write_digest, write_markdown_digest
 
+# Lazily imported inside main() — only needed there, and avoids pulling in
+# agent deps when unit-testing the pure aggregator logic above.
+# from agent.classifier import FeedbackClassifier
+
 CHECKBOX_RE = re.compile(r"^\s*-\s*\[ \]\s*(.+)$")
 DUE_DATE_RE = re.compile(r"(?:📅|due:)\s*(\d{4}-\d{2}-\d{2})", re.IGNORECASE)
 ONGOING_RE = re.compile(r"#(ongoing|overarching)\b", re.IGNORECASE)
@@ -101,7 +105,7 @@ def todos_from_calendar(calendar_digest: Optional[dict], today_iso: str) -> List
             "due": today_iso,
             "ongoing": False,
             "force_today": True,
-            "category": label if label in ("personal", "work") else None,
+            "category": label if label in ("personal", "work", "uni") else None,
             "origin": label,
         })
     return todos
@@ -122,6 +126,19 @@ def todos_from_emails(email_digest: Optional[dict], today_iso: str) -> List[dict
             "category": None,
             "origin": email.get("link"),
         })
+    return todos
+
+
+def _apply_classifier(todos: list, clf) -> list:
+    """Fill in missing category / urgency using the feedback classifier.
+    A human tag always beats the classifier."""
+    for todo in todos:
+        text = todo.get("text", "")
+        pred_cat, pred_urg = clf.classify(text)
+        if not todo.get("category") and pred_cat:
+            todo["category"] = pred_cat
+        if not todo.get("urgency") and pred_urg:
+            todo["urgency"] = pred_urg
     return todos
 
 
@@ -169,6 +186,9 @@ def main() -> int:
         print("VAULT_ROOT_DIR is not set; see python/.env.example", file=sys.stderr)
         return 1
 
+    from agent.classifier import FeedbackClassifier
+    clf = FeedbackClassifier.from_feedback_log(config.vault_inbox_dir, config.vault_root_dir)
+
     today = date.today()
     today_iso = today.isoformat()
 
@@ -193,6 +213,8 @@ def main() -> int:
             # Ollama being unreachable/slow/wrong must never break the
             # checkbox-parsing pipeline, which runs every few minutes via cron.
             print(f"LLM todo inference failed, skipping: {e}", file=sys.stderr)
+
+    todos = _apply_classifier(todos, clf)
 
     buckets = classify(todos, today)
     write_digest(os.path.join(config.vault_inbox_dir, "todos_digest.json"), buckets)

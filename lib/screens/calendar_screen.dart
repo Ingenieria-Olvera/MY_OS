@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/calendar_provider.dart';
+import '../services/agent_service.dart';
 import '../services/calendar_service.dart';
 import '../theme/app_theme.dart';
 
@@ -16,6 +19,10 @@ class CalendarScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('TODAY'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: () => _showAddEventDialog(context),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => context.read<CalendarProvider>().refresh(),
@@ -36,7 +43,7 @@ class CalendarScreen extends StatelessWidget {
           return ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: items.length,
-            itemBuilder: (context, i) => _buildTimelineTile(items[i]),
+            itemBuilder: (context, i) => _buildTimelineTile(context, items[i]),
           );
         },
       ),
@@ -52,7 +59,7 @@ class CalendarScreen extends StatelessWidget {
     return items;
   }
 
-  Widget _buildTimelineTile(_TimelineItem item) {
+  Widget _buildTimelineTile(BuildContext context, _TimelineItem item) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: IntrinsicHeight(
@@ -60,7 +67,7 @@ class CalendarScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-              width: 56,
+              width: 65,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -84,14 +91,26 @@ class CalendarScreen extends StatelessWidget {
                   color: AppTheme.surface,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Column(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.title, style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold)),
-                    if (item.subtitle != null) ...[
-                      const SizedBox(height: 4),
-                      Text(item.subtitle!, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
-                    ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(item.title, style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold)),
+                          if (item.subtitle != null) ...[
+                            const SizedBox(height: 4),
+                            Text(item.subtitle!, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (item.id != null && item.id!.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 20, color: AppTheme.textSecondary),
+                        onPressed: () => _deleteEvent(context, item.id!, item.account),
+                      ),
                   ],
                 ),
               ),
@@ -103,13 +122,82 @@ class CalendarScreen extends StatelessWidget {
   }
 
   static String _friendlyTime(DateTime time) {
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
+    return DateFormat('h:mm a').format(time.toLocal());
+  }
+
+  Future<void> _showAddEventDialog(BuildContext context) async {
+    final summaryCtrl = TextEditingController();
+    final startCtrl = TextEditingController();
+    final endCtrl = TextEditingController();
+    final cal = context.read<CalendarProvider>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: const Text('Add Event', style: TextStyle(color: AppTheme.textPrimary)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: summaryCtrl, decoration: const InputDecoration(labelText: 'Title'), style: const TextStyle(color: AppTheme.textPrimary)),
+            TextField(controller: startCtrl, decoration: const InputDecoration(labelText: 'Start (e.g. 2026-06-23T14:00:00Z)'), style: const TextStyle(color: AppTheme.textPrimary)),
+            TextField(controller: endCtrl, decoration: const InputDecoration(labelText: 'End (e.g. 2026-06-23T15:00:00Z)'), style: const TextStyle(color: AppTheme.textPrimary)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                final prefs = await SharedPreferences.getInstance();
+                final baseUrl = (prefs.getString('agent_base_url') ?? '').trim();
+                if (baseUrl.isEmpty) throw Exception('Base URL not set');
+
+                await AgentService.addCalendarEvent(
+                  baseUrl: baseUrl,
+                  summary: summaryCtrl.text,
+                  start: startCtrl.text,
+                  end: endCtrl.text,
+                );
+                if (!ctx.mounted) return;
+                Navigator.pop(ctx);
+                cal.refresh();
+              } catch (e) {
+                if (!ctx.mounted) return;
+                ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(e.toString())));
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteEvent(BuildContext context, String id, String? account) async {
+    final cal = context.read<CalendarProvider>();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final baseUrl = (prefs.getString('agent_base_url') ?? '').trim();
+      if (baseUrl.isEmpty) throw Exception('Base URL not set');
+
+      await AgentService.deleteCalendarEvent(
+        baseUrl: baseUrl,
+        id: id,
+        account: account,
+      );
+      if (!context.mounted) return;
+      cal.refresh();
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 }
 
 class _TimelineItem {
+  final String? id;
+  final String? account;
   final DateTime start;
   final DateTime end;
   final bool allDay;
@@ -118,6 +206,8 @@ class _TimelineItem {
   final Color color;
 
   _TimelineItem({
+    this.id,
+    this.account,
     required this.start,
     required this.end,
     required this.allDay,
@@ -128,6 +218,8 @@ class _TimelineItem {
 
   factory _TimelineItem.fromEvent(CalendarEvent event) {
     return _TimelineItem(
+      id: event.id,
+      account: event.account,
       start: event.start,
       end: event.end,
       allDay: event.allDay,

@@ -80,30 +80,64 @@ class _SlackTab extends StatelessWidget {
         itemBuilder: (context, i) {
           final message = provider.slackMessages[i];
           final isRead = provider.isRead(message.id);
-          return ListTile(
-            onTap: () => provider.markRead(message.id),
-            leading: Icon(
-              message.source == 'mention' ? Icons.alternate_email : Icons.chat_bubble_outline,
-              color: isRead ? AppTheme.textSecondary : AppTheme.accentPurple,
-            ),
-            title: Text(
-              message.sender,
-              style: TextStyle(
-                color: AppTheme.textPrimary,
-                fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Material(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => provider.markRead(message.id),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        message.source == 'mention' ? Icons.alternate_email : Icons.chat_bubble_outline,
+                        color: isRead ? AppTheme.textSecondary : AppTheme.accentPurple,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    message.sender,
+                                    style: TextStyle(
+                                      color: AppTheme.textPrimary,
+                                      fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Text(
+                                  _relativeTime(message.timestamp),
+                                  style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              message.text,
+                              style: const TextStyle(color: AppTheme.textSecondary),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Text(
-              message.text,
-              style: const TextStyle(color: AppTheme.textSecondary),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            trailing: Text(
-              _relativeTime(message.timestamp),
-              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
             ),
           );
         },
@@ -134,30 +168,72 @@ class _EmailTab extends StatelessWidget {
         itemBuilder: (context, i) {
           final email = provider.emails[i];
           final isRead = provider.isRead(email.id);
-          return ListTile(
-            onTap: () => provider.markRead(email.id),
-            leading: Icon(
-              Icons.email_outlined,
-              color: isRead ? AppTheme.textSecondary : AppTheme.accentPurple,
-            ),
-            title: Text(
-              email.subject,
-              style: TextStyle(
-                color: AppTheme.textPrimary,
-                fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Material(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => provider.markRead(email.id),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.email_outlined,
+                        color: isRead ? AppTheme.textSecondary : AppTheme.accentPurple,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    email.subject,
+                                    style: TextStyle(
+                                      color: AppTheme.textPrimary,
+                                      fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (email.receivedAt != null)
+                                  Text(
+                                    _relativeTime(email.receivedAt!),
+                                    style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              email.sender,
+                              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              email.snippet,
+                              style: const TextStyle(color: AppTheme.textSecondary),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Text(
-              '${email.sender}\n${email.snippet}',
-              style: const TextStyle(color: AppTheme.textSecondary),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            trailing: Text(
-              email.receivedAt == null ? '' : _relativeTime(email.receivedAt!),
-              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
             ),
           );
         },

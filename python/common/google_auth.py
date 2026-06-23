@@ -16,7 +16,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 
 GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
-CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar"]
 GOOGLE_SCOPES = GMAIL_SCOPES + CALENDAR_SCOPES
 
 

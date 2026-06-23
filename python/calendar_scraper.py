@@ -35,6 +35,7 @@ def fetch_events_for_calendar(
         start = item.get("start", {})
         end = item.get("end", {})
         events.append({
+            "id": item.get("id", ""),
             "label": label,
             "summary": item.get("summary", "(no title)"),
             "start": start.get("dateTime") or start.get("date"),

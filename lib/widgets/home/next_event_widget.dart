@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/calendar_provider.dart';
 import '../../theme/app_theme.dart';
+import 'package:intl/intl.dart';
 
 class NextEventWidget extends StatelessWidget {
   const NextEventWidget({super.key});
@@ -71,7 +72,7 @@ class NextEventWidget extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            '${TimeOfDay.fromDateTime(next.start).format(context)} · ${next.label}',
+                            '${DateFormat('h:mm a').format(next.start.toLocal())} · ${next.label}',
                             style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
                             overflow: TextOverflow.ellipsis,
                           ),

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/todos_provider.dart';
 import '../services/todos_service.dart';
+import '../services/agent_service.dart';
 import '../theme/app_theme.dart';
 
 class TodosScreen extends StatefulWidget {
@@ -233,8 +235,20 @@ class _TodoList extends StatelessWidget {
         return Icons.event_outlined;
       case 'email':
         return Icons.email_outlined;
+      case 'vault_inferred':
+        return Icons.auto_awesome;
       default:
-        return Icons.check_circle_outline;
+        return Icons.check_box_outline_blank;
+    }
+  }
+
+  Color _colorForCategory(String category) {
+    switch (category) {
+      case 'work': return AppTheme.statusOrange;
+      case 'personal': return AppTheme.statusGreen;
+      case 'uni': return AppTheme.accentPurple;
+      case 'project': return AppTheme.statusRed;
+      default: return AppTheme.textSecondary;
     }
   }
 
