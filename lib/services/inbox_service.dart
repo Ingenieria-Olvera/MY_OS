@@ -1,4 +1,5 @@
 import '../constants/vault_paths.dart';
+import 'digest_fetcher.dart';
 import 'vault_access.dart';
 
 /// A Slack DM or @-mention surfaced by `python/slack_scraper.py`.
@@ -93,10 +94,7 @@ class InboxDigest {
   }
 
   static Future<Map<String, dynamic>?> _readDigest(String? inboxUri, String filename) async {
-    final uri = inboxUri ?? await resolveVaultInboxUri();
-    if (uri == null) return null;
-    final fileEntry = await VaultAccess.child(uri, filename);
-    if (fileEntry == null) return null;
-    return VaultAccess.readJson(fileEntry.uri);
+    final digestName = filename.replaceAll('_digest.json', '');
+    return DigestFetcher.read(digestName, filename, inboxUri);
   }
 }

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/todos_provider.dart';
 import '../services/todos_service.dart';
+import '../services/agent_service.dart';
 import '../theme/app_theme.dart';
 
 class TodosScreen extends StatefulWidget {
@@ -93,16 +95,78 @@ class _TodoList extends StatelessWidget {
         itemCount: items.length,
         itemBuilder: (context, i) {
           final item = items[i];
-          return ListTile(
-            onTap: () => provider.toggleCompleted(item.id),
-            leading: Icon(_iconFor(item.source), color: AppTheme.accentPurple),
-            title: Text(item.text, style: const TextStyle(color: AppTheme.textPrimary)),
-            subtitle: item.origin.isNotEmpty
-                ? Text(
-                    item.due != null ? '${item.origin} · due ${item.due}' : item.origin,
-                    style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                  )
-                : null,
+          final hasCategory = item.category != null && item.category!.isNotEmpty;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Material(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () async {
+                  // UI optimistic update
+                  provider.toggleCompleted(item.id);
+                  // Backend update
+                  final prefs = await SharedPreferences.getInstance();
+                  final baseUrl = (prefs.getString('agent_base_url') ?? '').trim();
+                  if (baseUrl.isEmpty) return;
+                  
+                  try {
+                    await AgentService.toggleTodo(
+                      baseUrl: baseUrl,
+                      text: item.text,
+                    );
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to toggle on backend: $e')));
+                    }
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(_iconFor(item.source), color: AppTheme.accentPurple, size: 24),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(item.text, style: const TextStyle(color: AppTheme.textPrimary, fontSize: 16)),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 4,
+                              children: [
+                                if (item.origin.isNotEmpty)
+                                  Text(
+                                    item.due != null ? '${item.origin} · due ${item.due}' : item.origin,
+                                    style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                                  ),
+                                if (hasCategory)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: _colorForCategory(item.category!),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      item.category!.toUpperCase(),
+                                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.radio_button_unchecked, color: AppTheme.textSecondary),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           );
         },
       ),
@@ -115,8 +179,20 @@ class _TodoList extends StatelessWidget {
         return Icons.event_outlined;
       case 'email':
         return Icons.email_outlined;
+      case 'vault_inferred':
+        return Icons.auto_awesome;
       default:
-        return Icons.check_circle_outline;
+        return Icons.check_box_outline_blank;
+    }
+  }
+
+  Color _colorForCategory(String category) {
+    switch (category) {
+      case 'work': return AppTheme.statusOrange;
+      case 'personal': return AppTheme.statusGreen;
+      case 'uni': return AppTheme.accentPurple;
+      case 'project': return AppTheme.statusRed;
+      default: return AppTheme.textSecondary;
     }
   }
 }

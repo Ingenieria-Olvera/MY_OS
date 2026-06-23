@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/calendar_provider.dart';
 import '../../services/calendar_service.dart';
 import '../../theme/app_theme.dart';
+import 'package:intl/intl.dart';
 
 class CalendarSuggestionsWidget extends StatelessWidget {
   const CalendarSuggestionsWidget({super.key});
@@ -41,8 +42,9 @@ class CalendarSuggestionsWidget extends StatelessWidget {
   }
 
   Widget _buildSuggestionRow(BuildContext context, DaySuggestion s) {
-    final start = TimeOfDay.fromDateTime(s.start).format(context);
-    final end = TimeOfDay.fromDateTime(s.end).format(context);
+    final format = DateFormat('h:mm a');
+    final start = format.format(s.start);
+    final end = format.format(s.end);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(

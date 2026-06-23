@@ -1,4 +1,5 @@
 import '../constants/vault_paths.dart';
+import 'digest_fetcher.dart';
 import 'vault_access.dart';
 
 /// A single todo surfaced by `python/todos_aggregator.py`, sourced from the
@@ -55,10 +56,6 @@ class TodosDigest {
   }
 
   static Future<Map<String, dynamic>?> _readDigest(String? inboxUri) async {
-    final uri = inboxUri ?? await resolveVaultInboxUri();
-    if (uri == null) return null;
-    final fileEntry = await VaultAccess.child(uri, 'todos_digest.json');
-    if (fileEntry == null) return null;
-    return VaultAccess.readJson(fileEntry.uri);
+    return DigestFetcher.read('todos', 'todos_digest.json', inboxUri);
   }
 }
