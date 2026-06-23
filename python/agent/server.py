@@ -9,6 +9,7 @@ import json
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+from agent import scheduler
 from agent.ollama_client import OllamaError, generate
 from agent.vault_context import build_context
 from common.config import Config, load_config
@@ -66,6 +67,7 @@ class ChatHandler(BaseHTTPRequestHandler):
 def main() -> int:
     config = load_config()
     ChatHandler.config = config
+    scheduler.start_background(config)
     server = HTTPServer((config.agent_host, config.agent_port), ChatHandler)
     print(f"Agent chat server listening on http://{config.agent_host}:{config.agent_port}/chat")
     try:

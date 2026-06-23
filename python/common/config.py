@@ -85,6 +85,24 @@ class Config:
     todos_llm_inference: bool = False
     todos_llm_inference_limit: int = 5
 
+    # Opt-in: have `agent/server.py` run the scrapers + todos aggregator on
+    # this interval itself, in a background thread, instead of relying on
+    # cron (which Windows doesn't have). 0 (the default) disables this —
+    # keep using cron/Task Scheduler/manual runs instead. See agent/scheduler.py.
+    auto_scrape_interval_minutes: int = 0
+
+    # Second Gmail search run alongside gmail_query, so day-to-day "unread +
+    # important" mail doesn't crowd out messages Gmail itself wouldn't flag
+    # as important but you'd still want surfaced (bank/financial alerts,
+    # scholarship/financial-aid offers, recruiter/interview emails, etc.).
+    # Results from both queries are merged and de-duplicated by message id.
+    # Set to "" to disable.
+    gmail_keyword_query: str = (
+        'subject:(bank OR statement OR payment OR overdraft OR scholarship OR '
+        '"financial aid" OR tuition OR refund OR invoice OR offer OR interview '
+        'OR deadline OR application)'
+    )
+
     def google_account_triples(self) -> List[Tuple[str, str, str]]:
         """(account_name, credentials_file, token_file) per configured
         Google account."""
@@ -126,4 +144,11 @@ def load_config() -> Config:
         agent_port=int(os.environ.get("AGENT_PORT", "8765")),
         todos_llm_inference=os.environ.get("TODOS_LLM_INFERENCE", "false").strip().lower() == "true",
         todos_llm_inference_limit=int(os.environ.get("TODOS_LLM_INFERENCE_LIMIT", "5")),
+        auto_scrape_interval_minutes=int(os.environ.get("AUTO_SCRAPE_INTERVAL_MINUTES", "0")),
+        gmail_keyword_query=os.environ.get(
+            "GMAIL_KEYWORD_QUERY",
+            'subject:(bank OR statement OR payment OR overdraft OR scholarship OR '
+            '"financial aid" OR tuition OR refund OR invoice OR offer OR interview '
+            'OR deadline OR application)',
+        ),
     )

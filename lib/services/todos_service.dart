@@ -1,5 +1,23 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+
 import '../constants/vault_paths.dart';
 import 'vault_access.dart';
+
+/// The vault-root note that manually-added todos are appended to as plain
+/// `- [ ]` checkboxes, so `python/todos_aggregator.py` picks them up on its
+/// next run exactly like any other note in the vault.
+const manualTodosFileName = 'My Todos.md';
+
+/// Mirrors `_stable_id()` in python/todos_aggregator.py (`sha1("rel_path|text")`,
+/// first 16 hex chars) so a todo added in the app keeps the same id once the
+/// aggregator re-parses the vault and writes it into the digest — otherwise
+/// it would briefly show up twice.
+String stableTodoId(String relPath, String text) {
+  final digest = sha1.convert(utf8.encode('$relPath|$text'));
+  return digest.toString().substring(0, 16);
+}
 
 /// A single todo surfaced by `python/todos_aggregator.py`, sourced from the
 /// vault's Markdown checkboxes, the calendar digest, important emails, or

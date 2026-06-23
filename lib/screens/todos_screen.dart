@@ -53,8 +53,121 @@ class _TodosScreenState extends State<TodosScreen> with SingleTickerProviderStat
                     _TodoList(items: provider.pendingOverarching, provider: provider),
                   ],
                 ),
+          floatingActionButton: FloatingActionButton(
+            backgroundColor: AppTheme.accentPurple,
+            onPressed: () => _showAddTodoDialog(context, provider),
+            child: const Icon(Icons.add, color: Colors.white),
+          ),
         );
       },
+    );
+  }
+
+  void _showAddTodoDialog(BuildContext context, TodosProvider provider) {
+    final textController = TextEditingController();
+    String? category;
+    bool ongoing = false;
+    bool pinToday = false;
+    DateTime? due;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: AppTheme.surface,
+          title: const Text('New Todo', style: TextStyle(color: AppTheme.textPrimary)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: textController,
+                  autofocus: true,
+                  style: const TextStyle(color: AppTheme.textPrimary),
+                  decoration: const InputDecoration(
+                    labelText: 'What needs doing?',
+                    labelStyle: TextStyle(color: AppTheme.textSecondary),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Personal'),
+                      selected: category == 'personal',
+                      onSelected: (sel) => setDialogState(() => category = sel ? 'personal' : null),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Work'),
+                      selected: category == 'work',
+                      onSelected: (sel) => setDialogState(() => category = sel ? 'work' : null),
+                    ),
+                  ],
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: const Text('Pin to today (#today)', style: TextStyle(color: AppTheme.textPrimary)),
+                  value: pinToday,
+                  onChanged: (v) => setDialogState(() => pinToday = v ?? false),
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: const Text('Ongoing (#ongoing)', style: TextStyle(color: AppTheme.textPrimary)),
+                  value: ongoing,
+                  onChanged: (v) => setDialogState(() => ongoing = v ?? false),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.calendar_today_outlined, color: AppTheme.textSecondary),
+                  title: Text(
+                    due == null ? 'No due date' : 'Due ${due!.toIso8601String().split('T').first}',
+                    style: const TextStyle(color: AppTheme.textPrimary),
+                  ),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: due ?? DateTime.now(),
+                      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+                    );
+                    if (picked != null) setDialogState(() => due = picked);
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+            ),
+            TextButton(
+              onPressed: () async {
+                final dueIso = due?.toIso8601String().split('T').first;
+                final added = await provider.addTodo(
+                  text: textController.text,
+                  due: dueIso,
+                  ongoing: ongoing,
+                  pinToday: pinToday,
+                  category: category,
+                );
+                if (!context.mounted) return;
+                Navigator.pop(context);
+                if (!added) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Pick a vault folder first, or enter some text.')),
+                  );
+                }
+              },
+              child: const Text('Add', style: TextStyle(color: AppTheme.accentPurple)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
