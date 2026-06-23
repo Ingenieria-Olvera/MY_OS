@@ -19,6 +19,7 @@ import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Optional
 
+from agent import scheduler
 from agent.feedback import record_feedback
 from agent.ollama_client import OllamaError, generate
 from agent.vault_context import build_context
@@ -51,50 +52,11 @@ class ChatHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _send_raw_json(self, status: int, body: bytes) -> None:
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        self.wfile.write(body)
-
-    def do_GET(self) -> None:
-        # /digest/<name>  — serve a fresh digest JSON file
-        parts = self.path.strip("/").split("/")
-        if len(parts) == 2 and parts[0] == "digest":
-            self._handle_digest(parts[1])
-        else:
-            self._send_json(404, {"error": "not found"})
-
-    def _handle_digest(self, name: str) -> None:
-        filename = _DIGEST_FILES.get(name)
-        if not filename:
-            self._send_json(404, {"error": f"unknown digest '{name}'. Valid: {list(_DIGEST_FILES)}"})
-            return
-
-        path = os.path.join(self.config.vault_inbox_dir, filename)
-        if not os.path.exists(path):
-            self._send_json(404, {"error": f"{filename} not found — run the scrapers first"})
-            return
-
-        try:
-            with open(path, "rb") as f:
-                body = f.read()
-            self._send_raw_json(200, body)
-        except OSError as e:
-            self._send_json(500, {"error": str(e)})
-
+    def do_POST(self) -> None:
         if self.path == "/chat":
             self._handle_chat()
         elif self.path == "/feedback":
             self._handle_feedback()
-        elif self.path == "/todos/toggle":
-            self._handle_todos_toggle()
-        elif self.path == "/calendar/add":
-            self._handle_calendar_add()
-        elif self.path == "/calendar/delete":
-            self._handle_calendar_delete()
         else:
             self._send_json(404, {"error": "not found"})
 
@@ -306,6 +268,35 @@ class ChatHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._send_json(500, {"error": str(e)})
 
+    def _handle_feedback(self) -> None:
+        """Logs a correction to a suggested category/urgency (with an
+        optional free-text reason) to `Feedback Log.md` in the vault — the
+        app's "why wasn't this right" input lands here. See agent/feedback.py."""
+        if not self.config.vault_root_dir:
+            self._send_json(500, {"error": "VAULT_ROOT_DIR is not set"})
+            return
+
+        payload = self._read_json_body()
+        if payload is None:
+            self._send_json(400, {"error": "invalid JSON body"})
+            return
+
+        text = (payload.get("text") or "").strip()
+        if not text:
+            self._send_json(400, {"error": "'text' is required"})
+            return
+
+        record_feedback(
+            self.config.vault_root_dir,
+            text,
+            payload.get("suggested_category"),
+            payload.get("chosen_category"),
+            payload.get("suggested_urgency"),
+            payload.get("chosen_urgency"),
+            payload.get("reason"),
+        )
+        self._send_json(200, {"ok": True})
+
     def log_message(self, format: str, *args) -> None:
         sys.stderr.write("agent: " + (format % args) + "\n")
 
@@ -323,19 +314,7 @@ def main() -> int:
     _print_step("Loading configuration")
     config = load_config()
     ChatHandler.config = config
-    
-    _print_step("Checking Vault directory")
-    if not config.vault_root_dir or not os.path.isdir(config.vault_root_dir):
-        print(f"  -> [WARN] Vault root not found: {config.vault_root_dir}")
-        print("  -> [WARN] Some file-reading features will not work.")
-        
-    _print_step("Checking Inbox directory")
-    if not config.vault_inbox_dir or not os.path.isdir(config.vault_inbox_dir):
-        print(f"  -> [WARN] Vault inbox not found: {config.vault_inbox_dir}")
-        print("  -> [WARN] Digest endpoints will return 404 until scrapers run.")
-        
-    _print_step(f"Targeting Ollama at {config.ollama_host} (Model: {config.ollama_model})")
-    
+    scheduler.start_background(config)
     server = HTTPServer((config.agent_host, config.agent_port), ChatHandler)
     
     print("\n" + "="*50)

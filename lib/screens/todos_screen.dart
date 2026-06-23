@@ -55,8 +55,121 @@ class _TodosScreenState extends State<TodosScreen> with SingleTickerProviderStat
                     _TodoList(items: provider.pendingOverarching, provider: provider),
                   ],
                 ),
+          floatingActionButton: FloatingActionButton(
+            backgroundColor: AppTheme.accentPurple,
+            onPressed: () => _showAddTodoDialog(context, provider),
+            child: const Icon(Icons.add, color: Colors.white),
+          ),
         );
       },
+    );
+  }
+
+  void _showAddTodoDialog(BuildContext context, TodosProvider provider) {
+    final textController = TextEditingController();
+    String? category;
+    bool ongoing = false;
+    bool pinToday = false;
+    DateTime? due;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: AppTheme.surface,
+          title: const Text('New Todo', style: TextStyle(color: AppTheme.textPrimary)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: textController,
+                  autofocus: true,
+                  style: const TextStyle(color: AppTheme.textPrimary),
+                  decoration: const InputDecoration(
+                    labelText: 'What needs doing?',
+                    labelStyle: TextStyle(color: AppTheme.textSecondary),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Personal'),
+                      selected: category == 'personal',
+                      onSelected: (sel) => setDialogState(() => category = sel ? 'personal' : null),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Work'),
+                      selected: category == 'work',
+                      onSelected: (sel) => setDialogState(() => category = sel ? 'work' : null),
+                    ),
+                  ],
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: const Text('Pin to today (#today)', style: TextStyle(color: AppTheme.textPrimary)),
+                  value: pinToday,
+                  onChanged: (v) => setDialogState(() => pinToday = v ?? false),
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: const Text('Ongoing (#ongoing)', style: TextStyle(color: AppTheme.textPrimary)),
+                  value: ongoing,
+                  onChanged: (v) => setDialogState(() => ongoing = v ?? false),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.calendar_today_outlined, color: AppTheme.textSecondary),
+                  title: Text(
+                    due == null ? 'No due date' : 'Due ${due!.toIso8601String().split('T').first}',
+                    style: const TextStyle(color: AppTheme.textPrimary),
+                  ),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: due ?? DateTime.now(),
+                      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+                    );
+                    if (picked != null) setDialogState(() => due = picked);
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+            ),
+            TextButton(
+              onPressed: () async {
+                final dueIso = due?.toIso8601String().split('T').first;
+                final added = await provider.addTodo(
+                  text: textController.text,
+                  due: dueIso,
+                  ongoing: ongoing,
+                  pinToday: pinToday,
+                  category: category,
+                );
+                if (!context.mounted) return;
+                Navigator.pop(context);
+                if (!added) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Pick a vault folder first, or enter some text.')),
+                  );
+                }
+              },
+              child: const Text('Add', style: TextStyle(color: AppTheme.accentPurple)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -95,77 +208,20 @@ class _TodoList extends StatelessWidget {
         itemCount: items.length,
         itemBuilder: (context, i) {
           final item = items[i];
-          final hasCategory = item.category != null && item.category!.isNotEmpty;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Material(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(12),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () async {
-                  // UI optimistic update
-                  provider.toggleCompleted(item.id);
-                  // Backend update
-                  final prefs = await SharedPreferences.getInstance();
-                  final baseUrl = (prefs.getString('agent_base_url') ?? '').trim();
-                  if (baseUrl.isEmpty) return;
-                  
-                  try {
-                    await AgentService.toggleTodo(
-                      baseUrl: baseUrl,
-                      text: item.text,
-                    );
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to toggle on backend: $e')));
-                    }
-                  }
-                },
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(_iconFor(item.source), color: AppTheme.accentPurple, size: 24),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(item.text, style: const TextStyle(color: AppTheme.textPrimary, fontSize: 16)),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 4,
-                              children: [
-                                if (item.origin.isNotEmpty)
-                                  Text(
-                                    item.due != null ? '${item.origin} · due ${item.due}' : item.origin,
-                                    style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                                  ),
-                                if (hasCategory)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: _colorForCategory(item.category!),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      item.category!.toUpperCase(),
-                                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.radio_button_unchecked, color: AppTheme.textSecondary),
-                    ],
-                  ),
-                ),
-              ),
+          return ListTile(
+            onTap: () => provider.toggleCompleted(item.id),
+            leading: Icon(_iconFor(item.source), color: AppTheme.accentPurple),
+            title: Text(item.text, style: const TextStyle(color: AppTheme.textPrimary)),
+            subtitle: item.origin.isNotEmpty
+                ? Text(
+                    item.due != null ? '${item.origin} · due ${item.due}' : item.origin,
+                    style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                  )
+                : null,
+            trailing: IconButton(
+              icon: const Icon(Icons.edit_outlined, color: AppTheme.textSecondary, size: 20),
+              tooltip: 'Correct category/urgency',
+              onPressed: () => _showFeedbackDialog(context, provider, item),
             ),
           );
         },
@@ -194,5 +250,100 @@ class _TodoList extends StatelessWidget {
       case 'project': return AppTheme.statusRed;
       default: return AppTheme.textSecondary;
     }
+  }
+
+  void _showFeedbackDialog(BuildContext context, TodosProvider provider, TodoItem item) {
+    String? category = item.category;
+    String? urgency = item.urgency;
+    final reasonController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: AppTheme.surface,
+          title: const Text('Correct this todo', style: TextStyle(color: AppTheme.textPrimary)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(item.text, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+                const SizedBox(height: 16),
+                const Text('Category', style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final c in const ['personal', 'work', 'other'])
+                      ChoiceChip(
+                        label: Text(c[0].toUpperCase() + c.substring(1)),
+                        selected: category == c,
+                        onSelected: (sel) => setDialogState(() => category = sel ? c : null),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Text('Urgency', style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final entry in const {
+                      'today': 'Today',
+                      'this_week': 'This week',
+                      'overarching': 'Overarching (e.g. end of month)',
+                    }.entries)
+                      ChoiceChip(
+                        label: Text(entry.value),
+                        selected: urgency == entry.key,
+                        onSelected: (sel) => setDialogState(() => urgency = sel ? entry.key : null),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: reasonController,
+                  maxLines: 3,
+                  style: const TextStyle(color: AppTheme.textPrimary),
+                  decoration: const InputDecoration(
+                    labelText: 'Why? (optional)',
+                    labelStyle: TextStyle(color: AppTheme.textSecondary),
+                    hintText: "e.g. \"it's my own bank account, not work\"",
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                final reason = reasonController.text.trim();
+                final sent = await provider.submitFeedback(
+                  item: item,
+                  chosenCategory: category,
+                  chosenUrgency: urgency,
+                  reason: reason.isEmpty ? null : reason,
+                );
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(sent
+                        ? 'Feedback logged.'
+                        : 'Could not reach the agent — set its address in Settings first.'),
+                  ),
+                );
+              },
+              child: const Text('Submit', style: TextStyle(color: AppTheme.accentPurple)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

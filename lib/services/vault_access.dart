@@ -125,6 +125,17 @@ class VaultAccess {
     );
   }
 
+  /// Appends [line] (with a trailing newline) to [fileName] inside [dirUri],
+  /// creating the file if it doesn't exist yet. Used for manually-added
+  /// todo checkboxes, so they land as plain Markdown the Python aggregator
+  /// already knows how to parse.
+  static Future<void> appendLine(String dirUri, String fileName, String line) async {
+    final existing = await child(dirUri, fileName);
+    final current = existing != null ? (await readAsString(existing.uri) ?? '') : '';
+    final separator = current.isEmpty || current.endsWith('\n') ? '' : '\n';
+    await writeString(dirUri, fileName, '$current$separator$line\n');
+  }
+
   /// Recursively lists every `.md` file under [rootUri], skipping the
   /// `_inbox` folder (Python scrapers' digests, not vault notes).
   static Future<List<VaultEntry>> listMarkdownFilesRecursive(String rootUri) async {

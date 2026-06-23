@@ -61,7 +61,15 @@ single client secret file if they're all under the same Cloud project (see
    against each account opens a browser asking you to consent to both the
    Gmail-readonly and Calendar-readonly scopes at once; after that, both
    scrapers refresh silently from that account's cached token.
-4. Set `GOOGLE_CALENDAR_IDS` to your calendars (comma-separated — `primary`
+4. (Optional) `GMAIL_KEYWORD_QUERY` runs a second Gmail search alongside
+   `GMAIL_QUERY`, so mail Gmail itself wouldn't flag as "important" still
+   gets surfaced — by default it looks for bank/financial alerts,
+   scholarship/financial-aid offers, and recruiter/interview emails (see
+   `.env.example` for the exact query). Results from both searches are
+   merged and de-duplicated by message id; entries matched only by this
+   query are marked with a 🔑 in `email_digest.md`. Set it to `""` to
+   disable and only use `GMAIL_QUERY`.
+5. Set `GOOGLE_CALENDAR_IDS` to your calendars (comma-separated — `primary`
    is the main calendar for whichever account owns it; others look like
    `xxxx@group.calendar.google.com`, found under each calendar's
    **Settings → Integrate calendar**), `GOOGLE_CALENDAR_LABELS` with a
@@ -127,6 +135,47 @@ unit or `screen`/`tmux` session) rather than from cron:
 .venv/bin/python -m agent.server
 ```
 
+### No cron? (e.g. Windows)
+
+Cron isn't available on Windows. Instead, set `AUTO_SCRAPE_INTERVAL_MINUTES`
+in `.env` (e.g. `15`) and just run the agent server — it'll run the scrapers
+and `todos_aggregator.py` itself on that interval, on a background thread,
+for as long as the server process stays up:
+
+```bash
+.venv/bin/python -m agent.server
+```
+
+This is the same code path as running each script by hand, just looped —
+one scraper failing (bad token, no network) is logged and skipped, it won't
+stop the others or the loop. See `agent/scheduler.py`.
+
+To also get a refresh immediately on wake/unlock (rather than waiting for
+the next interval tick), register `run_once.py` — which runs the same
+scrapers a single time then exits — as a Task Scheduler task triggered "On
+workstation unlock":
+
+```powershell
+$action = New-ScheduledTaskAction -Execute "C:\path\to\.venv\Scripts\python.exe" `
+    -Argument "C:\path\to\MY_OS\python\run_once.py" -WorkingDirectory "C:\path\to\MY_OS\python"
+$trigger = New-ScheduledTaskTrigger -AtLogOn
+Register-ScheduledTask -TaskName "MyOS-ScrapeOnUnlock" -Action $action -Trigger $trigger
+```
+
+(`-AtLogOn` covers sign-in; Task Scheduler's GUI also offers an explicit "On
+workstation unlock" trigger under the task's Triggers tab if you want both.)
+Keep `agent/server.py` running too — it covers the periodic interval, this
+just adds an immediate refresh on wake.
+
+### Reaching the agent over Tailscale
+
+If the agent (`agent/server.py`) runs on a laptop you're not always on the
+same Wi-Fi as, set `AGENT_HOST=0.0.0.0` (or your Tailscale IP) in `.env` and
+point the app's agent base URL at `http://<tailscale-ip>:8765` instead of a
+LAN address. Tailscale's own encryption means you don't need to additionally
+authenticate `/chat` or `/feedback` — just don't expose the port outside the
+tailnet.
+
 ## Output format
 
 `<VAULT_INBOX_DIR>/slack_digest.json`:
@@ -160,7 +209,8 @@ unit or `screen`/`tmux` session) rather than from cron:
       "snippet": "Hi, can we sync on...",
       "received_at": "2026-06-20T13:40:00+00:00",
       "labels": ["IMPORTANT", "INBOX", "UNREAD"],
-      "link": "https://mail.google.com/mail/u/0/#inbox/18f2a..."
+      "link": "https://mail.google.com/mail/u/0/#inbox/18f2a...",
+      "matched": ["important", "keyword"]
     }
   ]
 }

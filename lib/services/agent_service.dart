@@ -35,8 +35,12 @@ class AgentService {
     return data['reply'] as String? ?? '';
   }
 
-  static Future<void> sendFeedback({
-    required String baseUrl,
+  /// Posts a correction to a suggested category/urgency (plus an optional
+  /// free-text reason) to the agent's `/feedback` endpoint, which appends it
+  /// to `Feedback Log.md` in the vault (see python/agent/feedback.py) — the
+  /// raw signal a future learned classifier would train on.
+  static Future<void> sendFeedback(
+    String baseUrl, {
     required String text,
     String? suggestedCategory,
     String? chosenCategory,
@@ -45,8 +49,9 @@ class AgentService {
     String? reason,
   }) async {
     final uri = Uri.parse('$baseUrl/feedback');
+    http.Response response;
     try {
-      final response = await http
+      response = await http
           .post(
             uri,
             headers: {'Content-Type': 'application/json'},
@@ -59,89 +64,12 @@ class AgentService {
               'reason': reason,
             }),
           )
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode != 200) {
-        throw AgentError('Feedback endpoint returned ${response.statusCode}');
-      }
+          .timeout(const Duration(seconds: 30));
     } catch (e) {
-      throw AgentError('Could not send feedback: $e');
+      throw AgentError('Could not reach the local agent at $baseUrl: $e');
     }
-  }
-
-  static Future<bool> toggleTodo({
-    required String baseUrl,
-    required String text,
-  }) async {
-    final uri = Uri.parse('$baseUrl/todos/toggle');
-    try {
-      final response = await http
-          .post(
-            uri,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'text': text}),
-          )
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode != 200) {
-        throw AgentError('Todos toggle returned ${response.statusCode}');
-      }
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      return data['found'] == true;
-    } catch (e) {
-      throw AgentError('Could not toggle todo: $e');
-    }
-  }
-
-  static Future<void> addCalendarEvent({
-    required String baseUrl,
-    required String summary,
-    required String start,
-    required String end,
-    String? account,
-  }) async {
-    final uri = Uri.parse('$baseUrl/calendar/add');
-    try {
-      final response = await http
-          .post(
-            uri,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'summary': summary,
-              'start': start,
-              'end': end,
-              'account': account,
-            }),
-          )
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode != 200) {
-        throw AgentError('Calendar add returned ${response.statusCode}');
-      }
-    } catch (e) {
-      throw AgentError('Could not add calendar event: $e');
-    }
-  }
-
-  static Future<void> deleteCalendarEvent({
-    required String baseUrl,
-    required String id,
-    String? account,
-  }) async {
-    final uri = Uri.parse('$baseUrl/calendar/delete');
-    try {
-      final response = await http
-          .post(
-            uri,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'id': id,
-              'account': account,
-            }),
-          )
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode != 200) {
-        throw AgentError('Calendar delete returned ${response.statusCode}');
-      }
-    } catch (e) {
-      throw AgentError('Could not delete calendar event: $e');
+    if (response.statusCode != 200) {
+      throw AgentError('Agent returned ${response.statusCode}: ${response.body}');
     }
   }
 }

@@ -1,41 +1,58 @@
+"""Append-only log of user corrections to suggested categories/urgency, with
+an optional free-text reason — the raw signal a future learned classifier
+would train on.
+
+Written to a vault-root note (not `_inbox`, which gets overwritten every
+digest run) so Obsidian/Syncthing carries it like any other note, and so it
+survives even if the app is reinstalled. The phone app posts here via
+`agent/server.py`'s `/feedback` endpoint over the same home Wi-Fi link as
+`/chat`.
+"""
 import os
-from datetime import datetime
+import re
+from datetime import datetime, timezone
 from typing import Optional
 
+FEEDBACK_FILE = "Feedback Log.md"
+
+_HEADER = (
+    "# Feedback Log\n\n"
+    "Corrections to suggested categories/urgency, logged for future "
+    "learning. Append-only — do not hand-edit past rows.\n\n"
+    "| time | text | suggested category | chosen category | suggested urgency "
+    "| chosen urgency | reason |\n"
+    "|---|---|---|---|---|---|---|\n"
+)
+
+
+def _escape(value: Optional[str]) -> str:
+    if not value:
+        return ""
+    return re.sub(r"\s+", " ", value).strip().replace("|", "\\|")
+
+
 def record_feedback(
-    inbox_dir: str,
+    vault_root: str,
     text: str,
     suggested_category: Optional[str],
     chosen_category: Optional[str],
     suggested_urgency: Optional[str],
     chosen_urgency: Optional[str],
-    reason: Optional[str] = None
+    reason: Optional[str] = None,
 ) -> None:
-    """Append a feedback correction to Feedback Log.md in the vault inbox."""
-    path = os.path.join(inbox_dir, "Feedback Log.md")
-    
-    # Create file with header if it doesn't exist
-    if not os.path.exists(path):
-        with open(path, "w", encoding="utf-8") as f:
-            f.write("# Feedback Log\n\n")
-            f.write("| Timestamp | Text | Suggested Category | Chosen Category | Suggested Urgency | Chosen Urgency | Reason |\n")
-            f.write("|---|---|---|---|---|---|---|\n")
+    """Appends one row to `Feedback Log.md` in the vault root. Creates the
+    file with a header on first use."""
+    path = os.path.join(vault_root, FEEDBACK_FILE)
+    is_new = not os.path.exists(path)
 
-    # Format row
-    now = datetime.now().isoformat(timespec='seconds')
-    
-    def _clean(s: Optional[str]) -> str:
-        if not s:
-            return ""
-        # Remove pipes and newlines so it doesn't break the markdown table
-        return str(s).replace("|", "-").replace("\n", " ").strip()
-
+    timestamp = datetime.now(timezone.utc).isoformat()
     row = (
-        f"| {_clean(now)} | {_clean(text)} "
-        f"| {_clean(suggested_category)} | {_clean(chosen_category)} "
-        f"| {_clean(suggested_urgency)} | {_clean(chosen_urgency)} "
-        f"| {_clean(reason)} |\n"
+        f"| {timestamp} | {_escape(text)} | {_escape(suggested_category)} | "
+        f"{_escape(chosen_category)} | {_escape(suggested_urgency)} | "
+        f"{_escape(chosen_urgency)} | {_escape(reason)} |\n"
     )
 
     with open(path, "a", encoding="utf-8") as f:
+        if is_new:
+            f.write(_HEADER)
         f.write(row)

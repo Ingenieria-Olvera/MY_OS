@@ -15,11 +15,16 @@ from agent.vault_context import recent_notes_with_content
 
 PROMPT_TEMPLATE = """You are a personal secretary reading someone's notes. \
 Find any action items implied by the prose below — things the person wrote \
-down but never turned into a checkbox todo. For each, decide if it's a \
-"personal" or "work" item, or null if unclear.
+down but never turned into a checkbox todo. For each, decide:
+- category: "personal", "work", "other", or null if unclear.
+- urgency: "today" if it reads as due immediately or blocking something else \
+today (e.g. an email that needs a same-day reply); "overarching" if it reads \
+as a longer-running or recurring goal with no hard deadline (e.g. "by the end \
+of the month", "eventually", a habit); otherwise "this_week".
 
 Respond with ONLY a JSON array, no other text. Each item: \
-{{"text": "...", "category": "personal" | "work" | null}}. \
+{{"text": "...", "category": "personal" | "work" | "other" | null, \
+"urgency": "today" | "this_week" | "overarching"}}. \
 If you find nothing actionable, respond with [].
 
 Notes:
@@ -64,14 +69,16 @@ def infer_todos_from_notes(
     for item in items:
         text = str(item["text"]).strip()
         category = item.get("category")
+        urgency = item.get("urgency")
         todos.append({
             "id": _stable_id("inferred", origin, text),
             "text": text,
             "source": "vault_inferred",
             "due": None,
-            "ongoing": False,
-            "force_today": False,
-            "category": category if category in ("personal", "work") else None,
+            "ongoing": urgency == "overarching",
+            "force_today": urgency == "today",
+            "category": category if category in ("personal", "work", "other") else None,
+            "urgency": urgency if urgency in ("today", "this_week", "overarching") else None,
             "origin": origin,
         })
     return todos

@@ -52,6 +52,10 @@ dependencies:
   google_fonts: ^6.2.1
   intl: ^0.19.0
 
+  # SHA-1 for todo ids that match python/todos_aggregator.py's hashing, so
+  # manually-added todos don't show up twice once the scraper picks them up.
+  crypto: ^3.0.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -1,6 +1,24 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+
 import '../constants/vault_paths.dart';
 import 'digest_fetcher.dart';
 import 'vault_access.dart';
+
+/// The vault-root note that manually-added todos are appended to as plain
+/// `- [ ]` checkboxes, so `python/todos_aggregator.py` picks them up on its
+/// next run exactly like any other note in the vault.
+const manualTodosFileName = 'My Todos.md';
+
+/// Mirrors `_stable_id()` in python/todos_aggregator.py (`sha1("rel_path|text")`,
+/// first 16 hex chars) so a todo added in the app keeps the same id once the
+/// aggregator re-parses the vault and writes it into the digest — otherwise
+/// it would briefly show up twice.
+String stableTodoId(String relPath, String text) {
+  final digest = sha1.convert(utf8.encode('$relPath|$text'));
+  return digest.toString().substring(0, 16);
+}
 
 /// A single todo surfaced by `python/todos_aggregator.py`, sourced from the
 /// vault's Markdown checkboxes, the calendar digest, important emails, or
@@ -11,7 +29,8 @@ class TodoItem {
   final String source; // 'vault' | 'vault_inferred' | 'calendar' | 'email'
   final String? due; // ISO date, e.g. '2026-06-21'
   final String origin; // note path, calendar label, or sender
-  final String? category; // 'personal' | 'work' | null
+  final String? category; // 'personal' | 'work' | 'other' | null
+  final String? urgency; // 'today' | 'this_week' | 'overarching' — why it landed in its bucket
 
   TodoItem({
     required this.id,
@@ -20,17 +39,23 @@ class TodoItem {
     required this.due,
     required this.origin,
     this.category,
+    this.urgency,
   });
+
+  static const _categories = {'personal', 'work', 'other'};
+  static const _urgencies = {'today', 'this_week', 'overarching'};
 
   factory TodoItem.fromJson(Map<String, dynamic> data) {
     final category = data['category'] as String?;
+    final urgency = data['urgency'] as String?;
     return TodoItem(
       id: data['id'] as String,
       text: data['text'] as String? ?? '',
       source: data['source'] as String? ?? 'vault',
       due: data['due'] as String?,
       origin: data['origin'] as String? ?? '',
-      category: category == 'personal' || category == 'work' ? category : null,
+      category: _categories.contains(category) ? category : null,
+      urgency: _urgencies.contains(urgency) ? urgency : null,
     );
   }
 }
