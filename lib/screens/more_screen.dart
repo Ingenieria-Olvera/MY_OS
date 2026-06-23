@@ -5,6 +5,7 @@ import 'chat_screen.dart';
 import 'financial_screen.dart';
 import 'health_screen.dart';
 import 'notes_screen.dart';
+import 'setup_checklist_screen.dart';
 
 class MoreScreen extends StatelessWidget {
   const MoreScreen({super.key});
@@ -21,6 +22,7 @@ class MoreScreen extends StatelessWidget {
           _buildTile(context, Icons.description_outlined, 'Notes', const NotesScreen()),
           _buildTile(context, Icons.account_balance_outlined, 'Financial', const FinancialScreen()),
           _buildTile(context, Icons.favorite_outline, 'Health', const HealthScreen()),
+          _buildTile(context, Icons.fact_check_outlined, 'Setup Checklist', const SetupChecklistScreen()),
         ],
       ),
     );

@@ -216,6 +216,11 @@ class _TodoList extends StatelessWidget {
                     style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                   )
                 : null,
+            trailing: IconButton(
+              icon: const Icon(Icons.edit_outlined, color: AppTheme.textSecondary, size: 20),
+              tooltip: 'Correct category/urgency',
+              onPressed: () => _showFeedbackDialog(context, provider, item),
+            ),
           );
         },
       ),
@@ -231,5 +236,100 @@ class _TodoList extends StatelessWidget {
       default:
         return Icons.check_circle_outline;
     }
+  }
+
+  void _showFeedbackDialog(BuildContext context, TodosProvider provider, TodoItem item) {
+    String? category = item.category;
+    String? urgency = item.urgency;
+    final reasonController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: AppTheme.surface,
+          title: const Text('Correct this todo', style: TextStyle(color: AppTheme.textPrimary)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(item.text, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+                const SizedBox(height: 16),
+                const Text('Category', style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final c in const ['personal', 'work', 'other'])
+                      ChoiceChip(
+                        label: Text(c[0].toUpperCase() + c.substring(1)),
+                        selected: category == c,
+                        onSelected: (sel) => setDialogState(() => category = sel ? c : null),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Text('Urgency', style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final entry in const {
+                      'today': 'Today',
+                      'this_week': 'This week',
+                      'overarching': 'Overarching (e.g. end of month)',
+                    }.entries)
+                      ChoiceChip(
+                        label: Text(entry.value),
+                        selected: urgency == entry.key,
+                        onSelected: (sel) => setDialogState(() => urgency = sel ? entry.key : null),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: reasonController,
+                  maxLines: 3,
+                  style: const TextStyle(color: AppTheme.textPrimary),
+                  decoration: const InputDecoration(
+                    labelText: 'Why? (optional)',
+                    labelStyle: TextStyle(color: AppTheme.textSecondary),
+                    hintText: "e.g. \"it's my own bank account, not work\"",
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                final reason = reasonController.text.trim();
+                final sent = await provider.submitFeedback(
+                  item: item,
+                  chosenCategory: category,
+                  chosenUrgency: urgency,
+                  reason: reason.isEmpty ? null : reason,
+                );
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(sent
+                        ? 'Feedback logged.'
+                        : 'Could not reach the agent — set its address in Settings first.'),
+                  ),
+                );
+              },
+              child: const Text('Submit', style: TextStyle(color: AppTheme.accentPurple)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

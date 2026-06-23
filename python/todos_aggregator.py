@@ -31,7 +31,7 @@ CHECKBOX_RE = re.compile(r"^\s*-\s*\[ \]\s*(.+)$")
 DUE_DATE_RE = re.compile(r"(?:📅|due:)\s*(\d{4}-\d{2}-\d{2})", re.IGNORECASE)
 ONGOING_RE = re.compile(r"#(ongoing|overarching)\b", re.IGNORECASE)
 TODAY_TAG_RE = re.compile(r"#today\b", re.IGNORECASE)
-CATEGORY_RE = re.compile(r"#(personal|work)\b", re.IGNORECASE)
+CATEGORY_RE = re.compile(r"#(personal|work|other)\b", re.IGNORECASE)
 
 
 def _stable_id(*parts: str) -> str:
@@ -127,7 +127,12 @@ def todos_from_emails(email_digest: Optional[dict], today_iso: str) -> List[dict
 
 def classify(todos: List[dict], today: date) -> dict:
     """today: due today/overdue, or explicitly #today-tagged.
-    overarching: everything else — future-dated, #ongoing, or undated."""
+    overarching: everything else — future-dated, #ongoing, or undated.
+
+    Also stamps an explicit `urgency` ("today" | "this_week" | "overarching")
+    onto every todo so the app can show *why* something landed in a bucket,
+    rather than re-deriving it from due/ongoing/force_today flags. An item
+    already carrying an `urgency` (e.g. from LLM inference) keeps it."""
     buckets = {"today": [], "overarching": []}
     for todo in todos:
         if todo.get("force_today"):
@@ -139,7 +144,11 @@ def classify(todos: List[dict], today: date) -> dict:
             bucket = "today" if due_date <= today else "overarching"
         else:
             bucket = "overarching"
-        buckets[bucket].append({k: v for k, v in todo.items() if k not in ("ongoing", "force_today")})
+
+        urgency = todo.get("urgency") or bucket
+        cleaned = {k: v for k, v in todo.items() if k not in ("ongoing", "force_today")}
+        cleaned["urgency"] = urgency
+        buckets[bucket].append(cleaned)
     return buckets
 
 
