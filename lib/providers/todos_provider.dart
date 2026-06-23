@@ -11,15 +11,8 @@ class TodosProvider extends ChangeNotifier {
   List<TodoItem> overarching = [];
   bool isLoading = true;
   Set<String> _completedIds = {};
-
-  // Manually-added todos, kept here until the next aggregator run writes
-  // them into todos_digest.json — at that point refresh() drops the local
-  // copy in favor of the (identically-id'd) digest one.
-  final List<TodoItem> _pendingToday = [];
-  final List<TodoItem> _pendingOverarching = [];
-
   TodosProvider() {
-    _loadCompletedIds().then((_) => refresh());
+    _loadCompletedIds();
   }
 
   bool isCompleted(String id) => _completedIds.contains(id);
